@@ -1,0 +1,23 @@
+---
+description: Bridge to the repository multi-agent instructions.
+alwaysApply: true
+---
+
+# Cursor adapter
+
+Use `/AGENTS.md` as the primary project instruction file.
+
+Canonical operational content lives in `/.agents/`.
+
+Use `/.agents/manifest.yaml` to locate:
+
+- rules
+- workflows
+- skills
+- agent profiles
+- hooks
+- templates
+
+Do not duplicate long project instructions here.
+
+If this file conflicts with `/AGENTS.md` or `/.agents/`, treat `/AGENTS.md` and `/.agents/` as canonical.

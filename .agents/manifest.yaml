@@ -1,0 +1,76 @@
+# Índice propio del proyecto; no es un formato nativo de Codex ni de Copilot.
+# schema_version versiona este esquema local, no una especificación externa.
+# Todas las rutas son relativas a la raíz del repositorio.
+schema_version: "1.0"
+entrypoint: AGENTS.md
+canonical_root: .agents
+manifest_path: .agents/manifest.yaml
+
+directories:
+  rules: .agents/rules
+  workflows: .agents/workflows
+  skills: .agents/skills
+  agents: .agents/agents
+  hooks: .agents/hooks
+  templates: .agents/templates
+
+loading:
+  # AGENTS.md y este manifest se leen antes de estas categorías.
+  order:
+    - rules
+    - workflows
+    - skills
+    - agents
+    - hooks
+    - templates
+  scope: relevant_to_current_task
+  missing_reference_policy: >-
+    Informar de toda referencia a un fichero inexistente. Si el fichero es
+    necesario para continuar conforme a AGENTS.md, detener la parte dependiente
+    y solicitar el dato o documento que falta. No inventar su contenido.
+
+# Registrar únicamente documentos existentes, con identificadores únicos.
+# Cada entrada usa: id, path y description.
+# Añadir applies_to cuando ayude a seleccionar el documento por tarea.
+# Un inventario vacío significa que todavía no se han registrado documentos;
+# no prueba que la carpeta esté vacía. Inspeccionarla antes de concluirlo.
+inventory:
+  rules: []
+  workflows: []
+  skills: []
+  agents: []
+  hooks: []
+  templates:
+    - id: completion-report
+      path: .agents/templates/completion-report.md
+      description: Informe final con cambios, comandos, validación y pendientes.
+      applies_to:
+        - task_completion
+
+# Describe las ubicaciones; no configura ni activa las herramientas.
+tool_support:
+  codex:
+    instructions: AGENTS.md
+    skills_directory: .agents/skills
+    instruction_bridge: null
+  claude_code:
+    instructions: AGENTS.md
+    skills_directory: .agents/skills
+    instruction_bridge: .claude/CLAUDE.md
+  cursor:
+    instructions: AGENTS.md
+    skills_directory: .agents/skills
+    instruction_bridge: .cursor/rules/agents.mdc
+  gemini_cli:
+    instructions: AGENTS.md
+    skills_directory: .agents/skills
+    instruction_bridge: .gemini/settings.json
+  github_copilot_vscode:
+    instructions: AGENTS.md
+    skills_directory: .agents/skills
+    instruction_bridge: .github/copilot-instructions.md
+
+validation:
+  # Completar cuando el stack y los comandos estén documentados.
+  # Cada entrada usa: id, command, working_directory y applies_to.
+  commands: []
