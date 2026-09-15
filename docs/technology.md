@@ -49,4 +49,4 @@ uv run uvicorn app.main:app --reload
 
 El último comando inicia la aplicación FastAPI registrada en `app/main.py`. La [documentación de uv](https://docs.astral.sh/uv/concepts/projects/sync/) describe el bloqueo, la sincronización y la ejecución con el entorno del proyecto.
 
-La estrategia de pruebas prevista separa la construcción del prompt de las llamadas al proveedor y permite sustituir el servicio LLM al probar el router. No existe aún una carpeta `tests/` ni una suite definida.
+La suite [`tests/`](../tests/) utiliza `unittest` de la biblioteca estándar y `TestClient` de FastAPI. Prueba la estructura mínima, el contrato HTTP y la llamada al SDK Responses con un cliente simulado, sin clave API ni tráfico externo. [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) ejecuta `uv sync --locked` y `uv run --no-sync python -m unittest discover -s tests -v` en cada push a `main` y pull request. Esto comprueba el comportamiento local; una prueba de disponibilidad del proveedor real requiere una validación separada con credenciales.

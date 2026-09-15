@@ -44,7 +44,7 @@ Los schemas validan la transcripción en la frontera HTTP y serializan la respue
 
 La llamada a una API LLM es una operación de espera de red. Para que una ruta `async` libere el event loop durante esa espera, el servicio debe usar operaciones que admitan `await`. Una llamada síncrona hecha directamente dentro de una función `async` bloquearía ese event loop. El servicio usa `AsyncOpenAI`; la política de timeouts, reintentos y errores HTTP queda pendiente de definir. La [guía de concurrencia de FastAPI](https://fastapi.tiangolo.com/async/) explica esta distinción.
 
-La capa de servicio debe permitir probar el formato del prompt sin llamadas HTTP ni peticiones reales al LLM. El router debe poder probarse con un servicio sustituido o simulado. No hay aún una carpeta `tests/`.
+La capa de servicio permite probar el formato del prompt sin llamadas HTTP ni peticiones reales al LLM. El router se prueba con un servicio simulado. La carpeta [`tests/`](../tests/) comprueba también los archivos obligatorios; [GitHub Actions](../.github/workflows/ci.yml) ejecuta estas pruebas en cada push a `main` y pull request.
 
 El servicio envía dos elementos en `input` de la API Responses: `system` contiene las instrucciones y los ejemplos CAG; `user` contiene la nueva transcripción. La respuesta del asistente se lee mediante `response.output_text`.
 

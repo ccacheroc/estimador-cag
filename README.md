@@ -40,3 +40,12 @@ curl -X POST http://127.0.0.1:8000/api/v1/estimate \
 ```
 
 La arquitectura prevista y el estado actual se describen en [docs/architecture.md](docs/architecture.md). Las tecnologías están en [docs/technology.md](docs/technology.md), y la elección de FastAPI en [ADR-001](docs/decisions/ADR-001-fastapi.md).
+
+La validación automática está en [`.github/workflows/ci.yml`](.github/workflows/ci.yml). En cada push a `main` y en cada pull request, GitHub Actions instala las dependencias fijadas en `uv.lock` y ejecuta las pruebas de `tests/`. Estas comprueban que existen los archivos obligatorios, que `/health` y `POST /api/v1/estimate` cumplen el contrato, y que el servicio envía el contexto CAG y la transcripción a la API Responses. La llamada a OpenAI se simula, así que el pipeline no necesita `OPENAI_API_KEY` ni incurre en costes. Para ejecutar las mismas pruebas en tu terminal:
+
+```bash
+uv sync --locked
+uv run --no-sync python -m unittest discover -s tests -v
+```
+
+Una ejecución correcta de CI verifica el código y el contrato local; no confirma que las credenciales o el proveedor externo estén disponibles en producción.
