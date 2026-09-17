@@ -36,9 +36,27 @@ loading:
 # no prueba que la carpeta esté vacía. Inspeccionarla antes de concluirlo.
 inventory:
   rules:
+    - id: agent-housekeeping
+      path: .agents/rules/agent-housekeeping.md
+      description: Mantenimiento de archivos auxiliares y consistencia del README.
+    - id: architecture
+      path: .agents/rules/architecture.md
+      description: Límites de capas y evolución arquitectónica del estimador CAG.
     - id: techstack
       path: .agents/rules/techstack.md
       description: Uso exclusivo de uv para gestión de dependencias, entornos y ejecución.
+    - id: communication-style
+      path: .agents/rules/communication-style.md
+      description: Comunicación concisa y resumen obligatorio al finalizar cada tarea.
+    - id: consistency-check-for-agents-changes
+      path: .agents/rules/consistency-check-for-agents-changes.md
+      description: Verificación de coherencia entre las especificaciones agénticas.
+    - id: task-change-commit-prompt
+      path: .agents/rules/task-change-commit-prompt.md
+      description: Solicita confirmación antes de crear un commit al cambiar de tarea.
+    - id: testing
+      path: .agents/rules/testing.md
+      description: Criterios y comandos de validación del proyecto.
   workflows:
     - id: abrir-sesion
       path: .agents/workflows/abrir-sesion.md
@@ -50,7 +68,13 @@ inventory:
       description: Finalizar sesión con commit, push y PR opcional.
       applies_to:
         - session_end
-  skills: []
+  skills:
+    - id: governance-check
+      path: .agents/skills/governance-check/SKILL.md
+      description: Clasificación y validación de artefactos de configuración agéntica.
+    - id: skill-creator
+      path: .agents/skills/skill-creator/SKILL.md
+      description: Creación, mejora y evaluación de skills de Codex.
   agents: []
   hooks: []
   templates:
