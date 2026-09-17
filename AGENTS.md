@@ -14,7 +14,6 @@ La fuente canónica de trabajo es:
 La carpeta `.agents/` contiene el contenido operativo real del proyecto:
 
 - reglas;
-- workflows;
 - skills;
 - perfiles de agente;
 - hooks;
@@ -29,11 +28,10 @@ Los ficheros específicos de herramientas como Claude Code, GitHub Copilot, Gemi
 1. Mantener la raíz del repositorio lo más limpia posible.
 2. Usar `AGENTS.md` como punto de entrada universal.
 3. Usar `.agents/` como fuente única de contenido operativo.
-4. Evitar duplicar reglas, workflows o skills en carpetas específicas de proveedor.
-5. Evitar symlinks como mecanismo principal de compatibilidad.
-6. Usar archivos puente mínimos cuando una herramienta exija una ruta concreta.
-7. Usar hooks, pruebas y validaciones para controles que deban ser verificables.
-8. No asumir convenciones del proyecto si no están documentadas.
+4. Evitar duplicar reglas, skills, agents, hooks o templates en carpetas específicas de proveedor.
+5. Evitar symlinks. En su lugar, usar archivos puente mínimos cuando una herramienta exija una ruta concreta.
+6. Usar hooks, pruebas y validaciones para controles que deban ser verificables.
+7. No asumir convenciones del proyecto si no están documentadas.
 
 ---
 
@@ -264,13 +262,9 @@ Si no se ha podido validar, debe explicar por qué.
 ## Revisión de gobernanza
 
 Antes de finalizar cambios en AGENTS.md, .agents/ o sus adaptadores
-específicos de herramienta, seguir:
+específicos de herramienta, seguir la skill:
 
-.agents/workflows/governance-check.md
-
-El workflow utiliza obligatoriamente:
-
-.agents/skills/artifact-governance/SKILL.md
+.agents/skills/governance-check/SKILL.md
 
 Aplicar las listas pertinentes y entregar el informe mediante:
 

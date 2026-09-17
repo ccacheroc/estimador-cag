@@ -1,12 +1,14 @@
-Lee primero `/AGENTS.md`.
+Canonical operational content lives in `/.agents/`.
 
-Después usa, según la tarea:
-- `/.agents/rules/`
-- `/.agents/workflows/`
-- `/.agents/skills/`
+Use `/.agents/manifest.yaml` to locate:
 
-No tomes este fichero como fuente de verdad.
-La fuente canónica del repositorio está en `/AGENTS.md` y en `/.agents/`.
+- rules
+- skills
+- agent profiles
+- hooks
+- templates
 
+Do not duplicate long project instructions here.
 
+If this file conflicts with `/AGENTS.md` or `/.agents/`, treat `/AGENTS.md` and `/.agents/` as canonical.
 

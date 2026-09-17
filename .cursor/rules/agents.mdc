@@ -12,7 +12,6 @@ Canonical operational content lives in `/.agents/`.
 Use `/.agents/manifest.yaml` to locate:
 
 - rules
-- workflows
 - skills
 - agent profiles
 - hooks

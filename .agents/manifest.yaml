@@ -35,8 +35,21 @@ loading:
 # Un inventario vacío significa que todavía no se han registrado documentos;
 # no prueba que la carpeta esté vacía. Inspeccionarla antes de concluirlo.
 inventory:
-  rules: []
-  workflows: []
+  rules:
+    - id: techstack
+      path: .agents/rules/techstack.md
+      description: Uso exclusivo de uv para gestión de dependencias, entornos y ejecución.
+  workflows:
+    - id: abrir-sesion
+      path: .agents/workflows/abrir-sesion.md
+      description: Iniciar nuevo requisito con commit/push previo, PR opcional y creación de rama.
+      applies_to:
+        - session_start
+    - id: cerrar-sesion
+      path: .agents/workflows/cerrar-sesion.md
+      description: Finalizar sesión con commit, push y PR opcional.
+      applies_to:
+        - session_end
   skills: []
   agents: []
   hooks: []

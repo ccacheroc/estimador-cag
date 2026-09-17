@@ -31,7 +31,17 @@ class EstimationResult:
 
 
 def build_system_prompt() -> str:
-    """Incluye las instrucciones y todos los ejemplos históricos en un único mensaje."""
+    """ 
+    Incluye las instrucciones y todos los ejemplos históricos en un único mensaje. 
+    Estructura: ROL Y EXPERTISE, TAREA CONCRETA, USO DE CONTEXTO REFERENCIA, FORMATO OUTPUT
+    Preprocesamiento de contexto: 
+        * Selección de campos/info relevante
+        * Normalización de formatos e.g. unos presupeustos en euros y otros en yenes, habría que normalizalos. 
+        * Cálculo de campos derivados e.g. duración total de un proyecto a partir de la duración de cada tarea, coste total a partir del coste de cada tarea, etc.
+        * Anonimización de datos sensibles e.g. nombres de clientes, nombres de empleados, etc.
+        * Atención: La posición importa. Instrucciones al principio, restricciones cerca del final, la consulta del usuario al final. Los datos de referencia en el medio, ordenados de mayor a menor relevancia.
+    """
+  
     instructions = dedent("""\
         Eres un estimador de proyectos de software experto. A partir de la
         transcripción de una nueva reunión, genera una estimación en español
@@ -43,6 +53,7 @@ def build_system_prompt() -> str:
         calcular costes, indica la tarifa que asumes. No atribuyas al cliente
         requisitos que no figuren en su transcripción.
     """).strip()
+    # Punto dulce: entre cinco y siete ejemplos diversos, con distintos alcances y complejidades, para que el modelo pueda generalizar mejor.
     examples = "\n\n".join(
         f"### Ejemplo previo {index}\n"
         f"Resumen de la reunión:\n{example['meeting_summary']}\n\n"
@@ -79,6 +90,8 @@ async def generate_estimation_details(transcription: str) -> EstimationResult:
     if not model:
         raise ValueError("LLM_MODEL debe estar configurado para usar OpenAI.")
     rates = get_model_rates(model)
+
+    # Atención: En OpenAI, puedes incluir múltiples mensajes system intercalados en la conversación. En Anthropic, el system prompt se pasa como parámetro separado, fuera del array de mensajes. Tu código debe contemplar estas diferencias si soportas múltiples proveedores.
     async with AsyncOpenAI(api_key=api_key) as client:
         response = await client.responses.create(
             model=model,

@@ -27,17 +27,66 @@ app/
 
 `app/services/llm_service.py` construye el prompt CAG con los cuatro ejemplos y llama de forma asíncrona a la API Responses de OpenAI con el modelo indicado por `LLM_MODEL` en `.env`. Envía las instrucciones y ejemplos como `system`, la transcripción como `user` y devuelve el texto generado por el asistente. `generate_estimation(transcription)` sigue devolviendo solo texto; `generate_estimation_details(transcription)` añade uso de tokens, coste estimado y metadatos. Requiere `LLM_PROVIDER=openai` y `OPENAI_API_KEY` configurada.
 
-`POST /api/v1/estimate` recibe `{"transcription": "..."}` y devuelve `estimation`, `model`, `provider`, `tokens_used`, `estimated_cost_usd`, `timestamp` y `response_id`. Los tokens proceden de la API Responses; las tarifas de texto de `gpt-4o-mini` están centralizadas en `app/config.py` y deben declararse con `Decimal("...")`, no con números `float`. Si cambias `LLM_MODEL`, registra también las tarifas de ese modelo en `MODEL_RATES`: el servicio rechazará la petición antes de llamar a OpenAI mientras falten. El coste es orientativo, no una factura, y será `null` si la API no devuelve datos de uso. Para iniciar la API: `uv run uvicorn app.main:app --reload`.
+`POST /api/v1/estimate` recibe `{"transcription": "..."}` y devuelve `estimation`, `model`, `provider`, `tokens_used`, `estimated_cost_usd`, `timestamp` y `response_id`. Los tokens proceden de la API Responses; las tarifas de texto de `gpt-4o-mini` están centralizadas en `app/config.py` y deben declararse con `Decimal("...")`, no con números `float`. Si cambias `LLM_MODEL`, registra también las tarifas de ese modelo en `MODEL_RATES`: el servicio rechazará la petición antes de llamar a OpenAI mientras falten. El coste es orientativo, no una factura, y será `null` si la API no devuelve datos de uso.
 
 `app/main.py` registra el router con el prefijo `/api/v1`, ofrece `GET /health` con `{"status": "ok"}` y configura el título y la descripción visibles en Swagger UI (`/docs`). El health check confirma que la API responde; no consulta al proveedor LLM.
 
-Con la API en ejecución, una petición de ejemplo es:
+## Cómo arrancar el proyecto
+
+### 1. Requisitos previos
+
+- Python `>=3.13`
+- [uv](https://docs.astral.sh/uv/) instalado en el sistema.
+
+### 2. Instalación de dependencias
+
+Sincroniza el entorno virtual y las dependencias del proyecto:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/v1/estimate \
-  -H 'Content-Type: application/json' \
-  -d '{"transcription":"El cliente necesita un portal para consultar pedidos y descargar facturas."}'
+uv sync
 ```
+
+### 3. Configuración de variables de entorno
+
+Copia la plantilla de configuración `.env.example` para generar tu archivo `.env`:
+
+```bash
+cp .env.example .env
+```
+
+Define los valores en `.env`:
+- `OPENAI_API_KEY`: Clave de API de OpenAI (necesaria para generar estimaciones reales con el LLM).
+- `LLM_PROVIDER`: Proveedor de LLM (por ejemplo, `openai`).
+- `LLM_MODEL`: Modelo a utilizar (por defecto `gpt-4o-mini`).
+- `APP_ENV`: Entorno de ejecución (`development`, `local`, etc.).
+- `LOG_LEVEL`: Nivel de logging (`INFO`, `DEBUG`, etc.).
+
+### 4. Arrancar el servidor de desarrollo
+
+Inicia la API con recarga automática en caliente:
+
+```bash
+uv run uvicorn app.main:app --reload
+```
+
+El servidor estará escuchando por defecto en `http://127.0.0.1:8000`.
+
+### 5. Verificación y uso
+
+- **Comprobación de salud (Health check):**
+  ```bash
+  curl http://127.0.0.1:8000/health
+  ```
+- **Documentación interactiva (Swagger UI):**
+  Disponible en el navegador en [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+- **Petición de estimación de ejemplo:**
+  ```bash
+  curl -X POST http://127.0.0.1:8000/api/v1/estimate \
+    -H 'Content-Type: application/json' \
+    -d '{"transcription":"El cliente necesita un portal para consultar pedidos y descargar facturas."}'
+  ```
+
+## Documentación y pruebas
 
 La arquitectura prevista y el estado actual se describen en [docs/architecture.md](docs/architecture.md). Las tecnologías están en [docs/technology.md](docs/technology.md), y la elección de FastAPI en [ADR-001](docs/decisions/ADR-001-fastapi.md).
 
