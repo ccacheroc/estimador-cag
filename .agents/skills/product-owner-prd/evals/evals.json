@@ -1,0 +1,29 @@
+{
+  "skill_name": "product-owner-prd",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Crea el PRD inicial de este producto a partir del README, las rutas, los schemas y los tests. Separa lo implementado de lo que sea solo una hipótesis.",
+      "expected_output": "Un PRD estructurado con actor, problema, outcome, alcance, requisitos con IDs estables, criterios de aceptación, supuestos, riesgos y distinción entre comportamiento implementado y planificado.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Actualiza el PRD para añadir exportación de estimaciones. Antes de aceptar XLSX como solución, analiza quién lo necesita, qué outcome busca y qué queda fuera del MVP.",
+      "expected_output": "Actualización acotada del PRD que conserva IDs, explicita el outcome, desafía la solución, limita el alcance y registra supuestos o decisiones materiales.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Revisa este PRD y dime qué requisitos son ambiguos, solution-first, no verificables o contradictorios. No lo modifiques.",
+      "expected_output": "Informe de revisión con hallazgos clasificados por impacto, evidencia, efecto y recomendación, sin editar silenciosamente el documento.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Reconcilia el PRD con la implementación y los tests. Identifica lo documentado pero no implementado, lo implementado sin intención confirmada y cualquier conflicto.",
+      "expected_output": "Matriz de discrepancias PRD_ONLY, CODE_ONLY, CONFLICT y TEST_CONFLICT con evidencia y próximos pasos, sin asumir que el código o el PRD tienen razón por defecto.",
+      "files": []
+    }
+  ]
+}

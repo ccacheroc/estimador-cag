@@ -75,6 +75,9 @@ inventory:
     - id: skill-creator
       path: .agents/skills/skill-creator/SKILL.md
       description: Creación, mejora y evaluación de skills de Codex.
+    - id: product-owner-prd
+      path: .agents/skills/product-owner-prd/SKILL.md
+      description: Creación, revisión, actualización y reconciliación de PRD con producto, código y tests.
   agents: []
   hooks: []
   templates:
