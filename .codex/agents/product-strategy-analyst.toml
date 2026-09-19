@@ -1,0 +1,14 @@
+name = "product-strategy-analyst"
+
+description = """
+Analiza ideas de producto, casos de uso, usuarios objetivo, propuestas de
+valor, oportunidades, alcance MVP, hipótesis y riesgos para convertir
+solicitudes iniciales en una dirección de producto clara y trazable.
+"""
+
+developer_instructions = """
+Antes de realizar la tarea, lee y sigue todas las instrucciones definidas en
+`.agents/agents/product-strategy-analyst.md`, resolviendo la ruta desde la raíz
+del repositorio. Trata ese archivo como la fuente canónica de instrucciones de
+este agente.
+"""

@@ -17,6 +17,7 @@ La carpeta `.agents/` contiene el contenido operativo real del proyecto:
 - skills;
 - perfiles de agente;
 - hooks;
+- workflows;
 - plantillas.
 
 Los ficheros específicos de herramientas como Claude Code, GitHub Copilot, Gemini CLI, Cursor, Codex, Windsurf o Devin deben funcionar solo como adaptadores mínimos. No deben duplicar instrucciones largas.
@@ -64,6 +65,39 @@ Antes de iniciar una tarea, cualquier agente debe leer en este orden:
 No es obligatorio cargar todos los documentos de `.agents/`.
 
 El agente debe cargar solo los documentos relevantes para la tarea.
+
+---
+
+## Delegación obligatoria en agentes especializados
+
+Ante cualquier solicitud del usuario, el agente de entrada debe consultar la
+sección `inventory.agents` de `/.agents/manifest.yaml` antes de comenzar el
+trabajo.
+
+Si existe un perfil en `/.agents/agents/` especializado en la tarea solicitada:
+
+1. Debe seleccionar el perfil cuyo ámbito coincida de forma más específica con
+   la tarea.
+2. Debe delegar en ese agente la tarea completa o la parte especializada,
+   proporcionándole la solicitud del usuario, el contexto relevante del
+   repositorio y las reglas, workflows y skills aplicables.
+3. Debe esperar a que el agente delegado finalice y devuelva su resultado antes
+   de redactar la respuesta final al usuario.
+4. Debe verificar que el resultado respeta las instrucciones del repositorio,
+   la evidencia disponible y la validación exigida antes de integrarlo.
+
+La delegación no amplía permisos ni autoriza acciones fuera del alcance pedido
+por el usuario. El agente de entrada conserva la responsabilidad sobre la
+respuesta final y debe informar si el agente delegado queda bloqueado o no
+puede validar una parte del trabajo.
+
+Un agente especializado no debe delegar de nuevo la misma tarea a su propio
+perfil. Puede delegar una parte distinta en otro perfil cuando exista una
+especialización clara y no se cree un ciclo.
+
+Si el entorno de ejecución no ofrece una capacidad real de delegación, el
+agente no debe fingir que la ha realizado. Debe indicarlo brevemente, cargar el
+perfil especializado y ejecutar sus instrucciones directamente como fallback.
 
 ---
 
@@ -153,6 +187,9 @@ Estos perfiles son portables.
 
 No pertenecen a una herramienta concreta.
 
+El agente de entrada debe descubrirlos mediante `/.agents/manifest.yaml` y
+aplicar la política de delegación definida en este documento.
+
 ---
 
 ### Hooks
@@ -191,6 +228,7 @@ Actualmente están definidos los siguientes:
     /.github/copilot-instructions.md
     /.gemini/settings.json
     /.cursor/rules/agents.mdc
+    /.codex/agents/product-strategy-analyst.toml
     
 
 Los archivos puente deben limitarse a indicar:
@@ -206,6 +244,10 @@ Los archivos puente deben limitarse a indicar:
 Codex utiliza directamente AGENTS.md como entrada del repositorio y descubre las skills en .agents/skills/.
 
 No requiere un archivo puente de instrucciones.
+
+Cuando Codex necesite ejecutar un perfil portable como subagente, puede usar un
+adaptador mínimo en `/.codex/agents/`. El adaptador debe limitarse a identificar
+el perfil canónico de `/.agents/agents/`; no debe duplicar sus instrucciones.
 
 El agente debe consultar .agents/manifest.yaml y seguir el orden de lectura definido en este documento.
 
@@ -280,14 +322,15 @@ Cuando un agente entre en este repositorio, debe actuar así:
 
 1. Leer `/AGENTS.md`.
 2. Leer `/.agents/manifest.yaml`.
-3. Identificar la tarea solicitada.
+3. Identificar la tarea solicitada y comprobar si existe un perfil especializado.
 4. Seleccionar las reglas relevantes.
 5. Seleccionar el workflow aplicable.
-6. Cargar las skills necesarias.
-7. Usar el perfil de agente adecuado si la tarea lo requiere.
+6. Cargar las skills necesarias y el perfil especializado, si procede.
+7. Delegar la tarea o parte especializada con el contexto aplicable.
 8. Aplicar los hooks conceptuales relevantes.
-9. Ejecutar la validación mínima posible.
-10. Entregar un reporte final siguiendo `/.agents/templates/completion-report.md`, si existe.
+9. Esperar y verificar el resultado de cualquier delegación activa.
+10. Ejecutar la validación mínima posible.
+11. Entregar un reporte final siguiendo `/.agents/templates/completion-report.md`, si existe.
 
 ---
 
