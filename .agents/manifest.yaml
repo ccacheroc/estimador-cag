@@ -45,6 +45,9 @@ inventory:
     - id: techstack
       path: .agents/rules/techstack.md
       description: Uso exclusivo de uv para gestión de dependencias, entornos y ejecución.
+    - id: technology
+      path: .agents/rules/technology.md
+      description: Tecnologías, configuración y decisiones vigentes del estimador CAG.
     - id: communication-style
       path: .agents/rules/communication-style.md
       description: Comunicación concisa y resumen obligatorio al finalizar cada tarea.
@@ -78,7 +81,14 @@ inventory:
     - id: product-owner-prd
       path: .agents/skills/product-owner-prd/SKILL.md
       description: Creación, revisión, actualización y reconciliación de PRD con producto, código y tests.
-  agents: []
+  agents:
+    - id: product-strategy-analyst
+      path: .agents/agents/product-strategy-analyst.md
+      description: Análisis estratégico de producto basado en la skill product-owner-prd.
+      applies_to:
+        - product_strategy
+        - ideation
+        - product_discovery
   hooks: []
   templates:
     - id: completion-report
