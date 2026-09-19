@@ -1,6 +1,6 @@
 # Tecnología del estimador CAG
 
-Este documento registra las tecnologías elegidas o previstas para la fase CAG. Las versiones declaradas son mínimos de `pyproject.toml`; las versiones resueltas están en `uv.lock`. Para las responsabilidades entre componentes, véase [architecture.md](architecture.md).
+Este documento registra las tecnologías elegidas o previstas para la fase CAG. Las versiones declaradas son mínimos de `pyproject.toml`; las versiones resueltas están en `uv.lock`. Para el estado funcional y las responsabilidades de producto, véase el [PRD](../../docs/PRD.md).
 
 ## Stack declarado
 
@@ -15,7 +15,7 @@ Este documento registra las tecnologías elegidas o previstas para la fase CAG. 
 
 ## FastAPI y llamadas LLM
 
-La decisión de adoptar FastAPI, con sus alternativas y consecuencias, está en [ADR-001](decisions/ADR-001-fastapi.md).
+La decisión de adoptar FastAPI, con sus alternativas y consecuencias, está en [ADR-001](../../docs/decisions/ADR-001-fastapi.md).
 
 FastAPI implementa ASGI y permite rutas `async`. Esto encaja con peticiones que esperan una API externa: mientras una operación asíncrona de red está en `await`, el servidor puede atender otras tareas. FastAPI es la elección de este proyecto por su integración de rutas y modelos Pydantic; otras soluciones ASGI también pueden ofrecer concurrencia para operaciones de red. La ventaja depende de usar un cliente LLM asíncrono; el ejemplo del texto de referencia que llama al cliente síncrono `OpenAI` dentro de `async def` no debe copiarse como implementación final. Si una biblioteca solo ofrece llamadas bloqueantes, se debe usar una ruta síncrona o trasladar esa llamada a un hilo, según la [guía oficial de FastAPI](https://fastapi.tiangolo.com/async/). No se presupone un número de peticiones concurrentes ni una latencia fija del LLM.
 
@@ -49,4 +49,4 @@ uv run uvicorn app.main:app --reload
 
 El último comando inicia la aplicación FastAPI registrada en `app/main.py`. La [documentación de uv](https://docs.astral.sh/uv/concepts/projects/sync/) describe el bloqueo, la sincronización y la ejecución con el entorno del proyecto.
 
-La suite [`tests/`](../tests/) utiliza `unittest` de la biblioteca estándar y `TestClient` de FastAPI. Prueba la estructura mínima, el contrato HTTP y la llamada al SDK Responses con un cliente simulado, sin clave API ni tráfico externo. [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) ejecuta `uv sync --locked` y `uv run --no-sync python -m unittest discover -s tests -v` en cada push a `main` y pull request. Esto comprueba el comportamiento local; una prueba de disponibilidad del proveedor real requiere una validación separada con credenciales.
+La suite [`tests/`](../../tests/) utiliza `unittest` de la biblioteca estándar y `TestClient` de FastAPI. Prueba la estructura mínima, el contrato HTTP, la interfaz Streamlit y la llamada al SDK Responses con un cliente simulado, sin clave API ni tráfico externo. [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) ejecuta `uv sync --locked` y `uv run --no-sync python -m unittest discover -s tests -v` en cada push a `main` y pull request. Esto comprueba el comportamiento local; una prueba de disponibilidad del proveedor real requiere una validación separada con credenciales.

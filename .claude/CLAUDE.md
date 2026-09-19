@@ -6,6 +6,7 @@ Use `/.agents/manifest.yaml` to locate:
 - skills
 - agent profiles
 - hooks
+- workflows
 - templates
 
 Do not duplicate long project instructions here.

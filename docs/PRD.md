@@ -59,6 +59,7 @@ La API HTTP de la primera fase CAG: health check, recepción de una transcripci�
 
 - `GET /health` para comprobar que el proceso responde.
 - `POST /api/v1/estimate` con una transcripción no vacía.
+- Interfaz de chat Streamlit para escribir o pegar transcripciones.
 - Generación en español mediante OpenAI Responses API.
 - Cuatro ejemplos estáticos de estimaciones como contexto CAG.
 - Desglose de tareas, horas, costes, equipo y duración solicitado en las instrucciones del prompt.
@@ -118,6 +119,26 @@ La API HTTP de la primera fase CAG: health check, recepción de una transcripci�
 **Main flow:** La API responde `{"status": "ok"}`.
 
 **Successful outcome:** Se confirma que el proceso HTTP responde; no se comprueba la disponibilidad de OpenAI.
+
+### FLOW-ESTIMATION-002 — Generar una estimación desde el chat
+
+**Actor:** Solicitante de una estimación.
+
+**Trigger:** Escribe o pega una transcripción en el chat Streamlit.
+
+**Preconditions:** Interfaz iniciada; configuración del proveedor disponible en `.env` o en el entorno; la sesión Streamlit tiene un historial inicializable.
+
+**Main flow:**
+
+1. La interfaz muestra el historial de mensajes de la sesión.
+2. El solicitante introduce una transcripción mediante `st.chat_input`.
+3. La interfaz muestra el texto como mensaje del usuario.
+4. La interfaz llama al mismo servicio que el endpoint HTTP.
+5. La interfaz muestra la estimación como mensaje del asistente y conserva ambos mensajes en `st.session_state`.
+
+**Successful outcome:** El solicitante ve la estimación en el chat sin que el system prompt CAG ni la gestión de credenciales se dupliquen en la interfaz.
+
+**Failure paths:** La interfaz muestra un error legible si la configuración está incompleta o el proveedor no devuelve una estimación.
 
 ## 7. Product Requirements
 
@@ -187,6 +208,31 @@ La API HTTP de la primera fase CAG: health check, recepción de una transcripci�
 - Given una respuesta del proveedor con uso, When se devuelve la estimación, Then `tokens_used` contiene tokens de entrada, salida, totales y caché.
 - Given tarifas conocidas y uso disponible, When se devuelve la estimación, Then `estimated_cost_usd` es no negativo y orientativo.
 - Given uso ausente, When se devuelve la estimación, Then los metadatos de uso y coste pueden ser `null`.
+
+### REQ-STREAMLIT-001 — Conversación de estimación en Streamlit
+
+**Status:** Active
+
+**Actor:** Solicitante de una estimación.
+
+**Problem / Job:** Necesita introducir una transcripción de forma interactiva y consultar la estimación dentro de una conversación visible.
+
+**Expected outcome:** La interfaz permite enviar texto y muestra la respuesta del LLM como mensaje del asistente, conservando el contexto visible durante la sesión.
+
+**Requirement:** La aplicación Streamlit debe usar `st.chat_message`, `st.chat_input` y `st.session_state`; debe delegar en `generate_estimation_details` para reutilizar el system prompt y la lógica CAG del endpoint; y no debe contener una API key.
+
+**Priority:** Important
+
+**Acceptance criteria:**
+
+- Given una sesión Streamlit, When el solicitante introduce una transcripción, Then la interfaz muestra el texto como mensaje `user`.
+- Given una transcripción válida y configuración disponible, When el servicio responde, Then la interfaz muestra `result.estimation` como mensaje `assistant`.
+- Given mensajes previos en la sesión, When Streamlit vuelve a ejecutar el script, Then el historial sigue visible mediante `st.session_state`.
+- Given una configuración sin API key o un error del proveedor, When se intenta generar la estimación, Then la interfaz muestra un error sin exponer credenciales.
+
+**Dependencies:** Streamlit, `app.services.llm_service.generate_estimation_details` y la configuración existente en `.env`.
+
+**Related flows:** `FLOW-ESTIMATION-002`.
 
 ### REQ-HEALTH-001 — Comprobar que la API responde
 
@@ -263,7 +309,9 @@ No hay autenticación, autorización, propiedad de datos ni separación de tenan
 
 ## 11. UX Requirements
 
-La interfaz actual es HTTP/API; no existe UI web documentada.
+La interfaz actual incluye la API HTTP y el chat Streamlit; no existe una UI web persistente más allá de la sesión actual.
+
+La interfaz Streamlit ofrece un chat de sesión única. No hay autenticación, persistencia entre sesiones ni sincronización entre usuarios.
 
 ### Success
 
@@ -280,6 +328,10 @@ Respuesta `503` cuando el proveedor, la API key, el modelo o sus tarifas no son 
 ### Provider error
 
 Respuesta `502` cuando OpenAI falla o no devuelve texto utilizable.
+
+### Streamlit chat
+
+La entrada se realiza con `st.chat_input`, los mensajes se representan con `st.chat_message` y el historial se mantiene en `st.session_state`. Los errores se muestran dentro del mensaje del asistente.
 
 ### Loading / timeout
 
@@ -371,6 +423,7 @@ No hay conclusiones legales en el repositorio. Debe revisarse el tratamiento de 
 - **DEC-2026-09-17-001 — API FastAPI:** El proyecto usa FastAPI sobre ASGI y separa composición, transporte, contratos, servicio y contexto. Detalle técnico en [ADR-001](decisions/ADR-001-fastapi.md).
 - **DEC-2026-09-17-002 — Contexto CAG estático:** La primera fase usa cuatro ejemplos sintéticos definidos en código; RAG queda para una fase posterior.
 - **DEC-2026-09-17-003 — Proveedor inicial OpenAI:** El servicio admite actualmente `openai` y exige tarifas explícitas para el modelo configurado.
+- **DEC-2026-09-17-004 — Interfaz Streamlit sobre el servicio existente:** El chat reutiliza `generate_estimation_details` para mantener el mismo prompt CAG, configuración y gestión de credenciales que la API HTTP.
 
 Estas decisiones reflejan el estado observable del repositorio; las decisiones de producto aún no confirmadas permanecen como supuestos u open questions.
 
@@ -379,3 +432,4 @@ Estas decisiones reflejan el estado observable del repositorio; las decisiones d
 | Date | Change | Requirements affected | Reason |
 |---|---|---|---|
 | 2026-09-17 | Creación del PRD inicial a partir de README, arquitectura, código y tests existentes. | REQ-ESTIMATION-001, REQ-ESTIMATION-002, REQ-ESTIMATION-003, REQ-HEALTH-001 | Establecer una fuente de intención de producto y separar comportamiento implementado de trabajo futuro. |
+| 2026-09-17 | Incorporación de una interfaz de chat Streamlit con historial de sesión y reutilización del servicio CAG. | REQ-STREAMLIT-001 | Facilitar la introducción interactiva de transcripciones sin duplicar el prompt ni las credenciales. |

@@ -71,7 +71,17 @@ uv run uvicorn app.main:app --reload
 
 El servidor estará escuchando por defecto en `http://127.0.0.1:8000`.
 
-### 5. Verificación y uso
+### 5. Interfaz de chat Streamlit
+
+Inicia la interfaz de chat con:
+
+```bash
+uv run streamlit run app/streamlit_app.py
+```
+
+La interfaz conserva el historial durante la sesión, usa el mismo servicio y system prompt CAG que el endpoint HTTP y carga `OPENAI_API_KEY` desde `.env`. No incluyas la clave directamente en el código.
+
+### 6. Verificación y uso
 
 - **Comprobación de salud (Health check):**
   ```bash
