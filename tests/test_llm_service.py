@@ -60,8 +60,11 @@ class LlmServiceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn(example["meeting_summary"], system_prompt)
                 self.assertIn(example["estimation"], system_prompt)
         self.assertEqual(result.estimation, "## Estimación de prueba")
-        self.assertEqual(result.tokens_used.total_tokens, 1200)
-        self.assertEqual(result.tokens_used.cached_input_tokens, 100)
+        tokens_used = result.tokens_used
+        self.assertIsNotNone(tokens_used)
+        assert tokens_used is not None
+        self.assertEqual(tokens_used.total_tokens, 1200)
+        self.assertEqual(tokens_used.cached_input_tokens, 100)
         self.assertEqual(result.estimated_cost_usd, 0.0002625)
         self.assertEqual(result.response_id, "resp_test")
 

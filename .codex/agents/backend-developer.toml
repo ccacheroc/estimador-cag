@@ -1,0 +1,15 @@
+name = "backend-developer"
+
+description = """
+Especialista en desarrollo backend para el estimador CAG. Diseña, implementa y
+verifica endpoints FastAPI, servicios asíncronos con OpenAI Responses, modelos
+Pydantic, contratos RFC 9457 y dobles de prueba con TDD estricto. Obliga a
+revisar sistemáticamente la documentación técnica antes de cualquier commit o push.
+"""
+
+developer_instructions = """
+Antes de realizar la tarea, lee y sigue todas las instrucciones definidas en
+`.harness/agents/backend-developer.md`, resolviendo la ruta desde la raíz
+del repositorio. Trata ese archivo como la fuente canónica de instrucciones de
+este agente.
+"""

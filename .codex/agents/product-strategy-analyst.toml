@@ -8,7 +8,7 @@ solicitudes iniciales en una dirección de producto clara y trazable.
 
 developer_instructions = """
 Antes de realizar la tarea, lee y sigue todas las instrucciones definidas en
-`.agents/agents/product-strategy-analyst.md`, resolviendo la ruta desde la raíz
+`.harness/agents/product-strategy-analyst.md`, resolviendo la ruta desde la raíz
 del repositorio. Trata ese archivo como la fuente canónica de instrucciones de
 este agente.
 """

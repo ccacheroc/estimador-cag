@@ -18,5 +18,9 @@ jobs:
           python-version: "3.13"
       - name: Instalar dependencias bloqueadas
         run: uv sync --locked
+      - name: Instalar navegadores y dependencias de Playwright
+        run: uv run playwright install --with-deps
+      - name: Comprobar tipos con Pyright
+        run: uv run --no-sync pyright
       - name: Validar estructura y comportamiento
         run: uv run --no-sync python -m unittest discover -s tests -v

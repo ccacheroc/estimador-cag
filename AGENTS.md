@@ -7,11 +7,11 @@ Este repositorio utiliza una arquitectura multiagente basada en capacidades.
 La fuente canónica de trabajo es:
 
     /AGENTS.md
-    /.agents/
+    /.harness/
 
 `AGENTS.md` es la puerta de entrada universal para cualquier agente de IA.
 
-La carpeta `.agents/` contiene el contenido operativo real del proyecto:
+La carpeta `.harness/` contiene el contenido operativo real del proyecto:
 
 - reglas;
 - skills;
@@ -28,7 +28,7 @@ Los ficheros específicos de herramientas como Claude Code, GitHub Copilot, Gemi
 
 1. Mantener la raíz del repositorio lo más limpia posible.
 2. Usar `AGENTS.md` como punto de entrada universal.
-3. Usar `.agents/` como fuente única de contenido operativo.
+3. Usar `.harness/` como fuente única de contenido operativo.
 4. Evitar duplicar reglas, skills, agents, hooks o templates en carpetas específicas de proveedor.
 5. Evitar symlinks. En su lugar, usar archivos puente mínimos cuando una herramienta exija una ruta concreta.
 6. Usar hooks, pruebas y validaciones para controles que deban ser verificables.
@@ -38,7 +38,7 @@ Los ficheros específicos de herramientas como Claude Code, GitHub Copilot, Gemi
 
 ## Estructura canónica
 
-    .agents/
+    .harness/
     ├── manifest.yaml   # Índice máquina-legible del sistema agéntico
     ├── rules/          # Reglas globales del repositorio
     ├── workflows/      # Procesos paso a paso
@@ -54,15 +54,15 @@ Los ficheros específicos de herramientas como Claude Code, GitHub Copilot, Gemi
 Antes de iniciar una tarea, cualquier agente debe leer en este orden:
 
 1. `/AGENTS.md`
-2. `/.agents/manifest.yaml`
-3. Las reglas relevantes en `/.agents/rules/`
-4. El workflow aplicable en `/.agents/workflows/`
-5. La skill necesaria en `/.agents/skills/`
-6. El perfil de agente adecuado en `/.agents/agents/`, si procede
-7. Los hooks relevantes en `/.agents/hooks/`, si la tarea modifica ficheros o genera artefactos
-8. Las plantillas necesarias en `/.agents/templates/`
+2. `/.harness/manifest.yaml`
+3. Las reglas relevantes en `/.harness/rules/`
+4. El workflow aplicable en `/.harness/workflows/`
+5. La skill necesaria en `/.harness/skills/`
+6. El perfil de agente adecuado en `/.harness/agents/`, si procede
+7. Los hooks relevantes en `/.harness/hooks/`, si la tarea modifica ficheros o genera artefactos
+8. Las plantillas necesarias en `/.harness/templates/`
 
-No es obligatorio cargar todos los documentos de `.agents/`.
+No es obligatorio cargar todos los documentos de `.harness/`.
 
 El agente debe cargar solo los documentos relevantes para la tarea.
 
@@ -71,10 +71,10 @@ El agente debe cargar solo los documentos relevantes para la tarea.
 ## Delegación obligatoria en agentes especializados
 
 Ante cualquier solicitud del usuario, el agente de entrada debe consultar la
-sección `inventory.agents` de `/.agents/manifest.yaml` antes de comenzar el
+sección `inventory.harness` de `/.harness/manifest.yaml` antes de comenzar el
 trabajo.
 
-Si existe un perfil en `/.agents/agents/` especializado en la tarea solicitada:
+Si existe un perfil en `/.harness/agents/` especializado en la tarea solicitada:
 
 1. Debe seleccionar el perfil cuyo ámbito coincida de forma más específica con
    la tarea.
@@ -108,16 +108,16 @@ Si varios documentos contienen instrucciones relacionadas, aplicar esta preceden
 1. Solicitud explícita del usuario
 2. Reglas de seguridad y restricciones del entorno
 3. `/AGENTS.md`
-4. `/.agents/manifest.yaml`
-5. `/.agents/rules/`
-6. `/.agents/workflows/`
-7. `/.agents/skills/`
-8. `/.agents/agents/`
-9. `/.agents/hooks/`
-10. `/.agents/templates/`
+4. `/.harness/manifest.yaml`
+5. `/.harness/rules/`
+6. `/.harness/workflows/`
+7. `/.harness/skills/`
+8. `/.harness/agents/`
+9. `/.harness/hooks/`
+10. `/.harness/templates/`
 11. Archivos puente específicos de herramientas
 
-Los archivos puente de herramientas nunca deben prevalecer sobre `/AGENTS.md` ni sobre `.agents/`.
+Los archivos puente de herramientas nunca deben prevalecer sobre `/AGENTS.md` ni sobre `.harness/`.
 
 ---
 
@@ -144,7 +144,11 @@ Todo agente que trabaje en este repositorio debe cumplir estas reglas:
 
 Las reglas globales viven en:
 
-    /.agents/rules/
+    /.harness/rules/
+
+La regla `/.harness/rules/ponytail.md` establece el criterio de implementar la
+solución mínima necesaria, priorizando reutilización, capacidades nativas y la
+corrección de la causa raíz.
 
 
 ---
@@ -153,7 +157,7 @@ Las reglas globales viven en:
 
 Los workflows viven en:
 
-    /.agents/workflows/
+    /.harness/workflows/
 
 
 
@@ -163,7 +167,7 @@ Los workflows viven en:
 
 Las skills viven en:
 
-    /.agents/skills/
+    /.harness/skills/
 
 Cada skill debe seguir esta estructura general:
 
@@ -180,14 +184,14 @@ Cada skill debe seguir esta estructura general:
 
 Los perfiles de agente viven en:
 
-    /.agents/agents/
+    /.harness/agents/
 
 
 Estos perfiles son portables.
 
 No pertenecen a una herramienta concreta.
 
-El agente de entrada debe descubrirlos mediante `/.agents/manifest.yaml` y
+El agente de entrada debe descubrirlos mediante `/.harness/manifest.yaml` y
 aplicar la política de delegación definida en este documento.
 
 ---
@@ -196,11 +200,11 @@ aplicar la política de delegación definida en este documento.
 
 Las definiciones conceptuales de hooks viven en:
 
-    /.agents/hooks/
+    /.harness/hooks/
 
 
 
-Importante: los hooks en `.agents/hooks/` son definiciones portables.
+Importante: los hooks en `.harness/hooks/` son definiciones portables.
 
 Cada herramienta puede requerir un adaptador propio para ejecutarlos realmente.
 
@@ -210,7 +214,7 @@ Cada herramienta puede requerir un adaptador propio para ejecutarlos realmente.
 
 Las plantillas viven en:
 
-    /.agents/templates/
+    /.harness/templates/
 
 
 
@@ -220,37 +224,59 @@ Las plantillas viven en:
 
 Algunas herramientas requieren ficheros propios para cargar instrucciones.
 
-Esos ficheros deben ser adaptadores mínimos hacia `/AGENTS.md` y `/.agents/`.
+Esos ficheros deben ser adaptadores mínimos hacia `/AGENTS.md` y `/.harness/`.
 
 Actualmente están definidos los siguientes:
 
     /.claude/CLAUDE.md
     /.github/copilot-instructions.md
+    /.github/agents/product-strategy-analyst.agent.md
+    /.github/agents/backend-developer.agent.md
+    /.github/agents/frontend-developer.agent.md
+    /.github/agents/qa-analyst.agent.md
     /.gemini/settings.json
     /.cursor/rules/agents.mdc
     /.codex/agents/product-strategy-analyst.toml
+    /.codex/agents/backend-developer.toml
+    /.codex/agents/frontend-developer.toml
+    /.codex/agents/qa-analyst.toml
+    /.agent/rules/agents.md
+    /.agent/workflows/abrir-sesion.md
+    /.agent/workflows/cerrar-sesion.md
     
 
 Los archivos puente deben limitarse a indicar:
 
 1. que `/AGENTS.md` es el punto de entrada;
-2. que `/.agents/` es la fuente canónica;
-3. que `/.agents/manifest.yaml` debe usarse como índice operativo;
+2. que `/.harness/` es la fuente canónica;
+3. que `/.harness/manifest.yaml` debe usarse como índice operativo;
 4. que no deben duplicarse instrucciones largas.
 
 ---
 ## Soporte para Codex
 
-Codex utiliza directamente AGENTS.md como entrada del repositorio y descubre las skills en .agents/skills/.
+Codex utiliza directamente AGENTS.md como entrada del repositorio y descubre las skills en .harness/skills/.
 
 No requiere un archivo puente de instrucciones.
 
 Cuando Codex necesite ejecutar un perfil portable como subagente, puede usar un
 adaptador mínimo en `/.codex/agents/`. El adaptador debe limitarse a identificar
-el perfil canónico de `/.agents/agents/`; no debe duplicar sus instrucciones.
+el perfil canónico de `/.harness/agents/`; no debe duplicar sus instrucciones.
 
-El agente debe consultar .agents/manifest.yaml y seguir el orden de lectura definido en este documento.
+El agente debe consultar .harness/manifest.yaml y seguir el orden de lectura definido en este documento.
 
+
+---
+
+## Soporte para Antigravity
+
+Antigravity busca sus especificaciones en la carpeta `/.agent/` (en singular).
+
+Para mantener `/.harness/` como fuente canónica única sin duplicar instrucciones ni depender de symlinks, se utiliza `/.agent/` con adaptadores puente mínimos:
+
+- `/.agent/rules/agents.md`: regla persistente (`trigger: always_on`) que instruye a Antigravity a leer `/AGENTS.md` y `/.harness/manifest.yaml`.
+- `/.agent/workflows/`: adaptadores mínimos para invocar los workflows canónicos de `/.harness/workflows/` (ej. `/abrir-sesion`, `/cerrar-sesion`).
+- `/.agent/skills/`: adaptadores con `SKILL.md` para el descubrimiento semántico de skills de `/.harness/skills/`.
 
 ---
 
@@ -258,14 +284,14 @@ El agente debe consultar .agents/manifest.yaml y seguir el orden de lectura defi
 
 No duplicar en adaptadores específicos el contenido de:
 
-    /.agents/rules/
-    /.agents/workflows/
-    /.agents/skills/
-    /.agents/agents/
-    /.agents/hooks/
-    /.agents/templates/
+    /.harness/rules/
+    /.harness/workflows/
+    /.harness/skills/
+    /.harness/agents/
+    /.harness/hooks/
+    /.harness/templates/
 
-Si una herramienta necesita un formato propio, crear un puente mínimo o generar un adaptador derivado desde `.agents/`.
+Si una herramienta necesita un formato propio, crear un puente mínimo o generar un adaptador derivado desde `.harness/`.
 
 ---
 
@@ -303,14 +329,14 @@ Si no se ha podido validar, debe explicar por qué.
 ---
 ## Revisión de gobernanza
 
-Antes de finalizar cambios en AGENTS.md, .agents/ o sus adaptadores
+Antes de finalizar cambios en AGENTS.md, .harness/ o sus adaptadores
 específicos de herramienta, seguir la skill:
 
-.agents/skills/governance-check/SKILL.md
+.harness/skills/governance-check/SKILL.md
 
 Aplicar las listas pertinentes y entregar el informe mediante:
 
-.agents/templates/completion-report.md
+.harness/templates/completion-report.md
 
 Esta revisión no se exige para cambios ordinarios de código que
 no afecten a la configuración agéntica.
@@ -321,7 +347,7 @@ no afecten a la configuración agéntica.
 Cuando un agente entre en este repositorio, debe actuar así:
 
 1. Leer `/AGENTS.md`.
-2. Leer `/.agents/manifest.yaml`.
+2. Leer `/.harness/manifest.yaml`.
 3. Identificar la tarea solicitada y comprobar si existe un perfil especializado.
 4. Seleccionar las reglas relevantes.
 5. Seleccionar el workflow aplicable.
@@ -330,7 +356,7 @@ Cuando un agente entre en este repositorio, debe actuar así:
 8. Aplicar los hooks conceptuales relevantes.
 9. Esperar y verificar el resultado de cualquier delegación activa.
 10. Ejecutar la validación mínima posible.
-11. Entregar un reporte final siguiendo `/.agents/templates/completion-report.md`, si existe.
+11. Entregar un reporte final siguiendo `/.harness/templates/completion-report.md`, si existe.
 
 ---
 
@@ -342,4 +368,4 @@ Su función es orientar al agente hacia la fuente correcta.
 
 La fuente operativa real del proyecto es:
 
-    /.agents/
+    /.harness/

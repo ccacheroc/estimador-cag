@@ -108,11 +108,7 @@ async def generate_estimation_details(transcription: str) -> EstimationResult:
     tokens_used = None
     estimated_cost_usd = None
     if usage is not None:
-        cached_tokens = (
-            usage.input_tokens_details.cached_tokens
-            if usage.input_tokens_details is not None
-            else 0
-        )
+        cached_tokens = usage.input_tokens_details.cached_tokens
         tokens_used = TokenUsage(
             input_tokens=usage.input_tokens,
             output_tokens=usage.output_tokens,

@@ -29,24 +29,30 @@ app/
 
 `POST /api/v1/estimate` recibe `{"transcription": "..."}` y devuelve `estimation`, `model`, `provider`, `tokens_used`, `estimated_cost_usd`, `timestamp` y `response_id`. Los tokens proceden de la API Responses; las tarifas de texto de `gpt-4o-mini` están centralizadas en `app/config.py` y deben declararse con `Decimal("...")`, no con números `float`. Si cambias `LLM_MODEL`, registra también las tarifas de ese modelo en `MODEL_RATES`: el servicio rechazará la petición antes de llamar a OpenAI mientras falten. El coste es orientativo, no una factura, y será `null` si la API no devuelve datos de uso.
 
+Los errores HTTP con cuerpo siguen RFC 9457 y usan
+`application/problem+json`. El OpenAPI generado documenta los contratos `422`,
+`500`, `502` y `503` de la estimación, incluidos sus tipos de problema estables.
+
 `app/main.py` registra el router con el prefijo `/api/v1`, ofrece `GET /health` con `{"status": "ok"}` y configura el título y la descripción visibles en Swagger UI (`/docs`). El health check confirma que la API responde; no consulta al proveedor LLM.
 
-## Cómo arrancar el proyecto
+## Guía de desarrollo (Development Guide)
+
+Esta guía detalla el paso a paso para configurar el entorno local, arrancar los servicios y ejecutar la suite de pruebas unitarias, de integración y End-to-End con Playwright.
 
 ### 1. Requisitos previos
 
-- Python `>=3.13`
-- [uv](https://docs.astral.sh/uv/) instalado en el sistema.
+- **Python** `>=3.13`
+- [uv](https://docs.astral.sh/uv/) (gestor exclusivo de dependencias y entornos del proyecto)
+- **Git**
 
-### 2. Instalación de dependencias
+### 2. Clonación y configuración del entorno
 
-Sincroniza el entorno virtual y las dependencias del proyecto:
+Clona el repositorio si aún no lo has hecho y sitúate en la raíz del proyecto:
 
 ```bash
-uv sync
+git clone <url-del-repositorio>
+cd estimador-cag
 ```
-
-### 3. Configuración de variables de entorno
 
 Copia la plantilla de configuración `.env.example` para generar tu archivo `.env`:
 
@@ -54,57 +60,95 @@ Copia la plantilla de configuración `.env.example` para generar tu archivo `.en
 cp .env.example .env
 ```
 
-Define los valores en `.env`:
-- `OPENAI_API_KEY`: Clave de API de OpenAI (necesaria para generar estimaciones reales con el LLM).
-- `LLM_PROVIDER`: Proveedor de LLM (por ejemplo, `openai`).
+Configura las variables necesarias en `.env`:
+- `OPENAI_API_KEY`: Clave de API de OpenAI (necesaria para interactuar con el LLM en local).
+- `LLM_PROVIDER`: Proveedor de LLM (por defecto `openai`).
 - `LLM_MODEL`: Modelo a utilizar (por defecto `gpt-4o-mini`).
-- `APP_ENV`: Entorno de ejecución (`development`, `local`, etc.).
-- `LOG_LEVEL`: Nivel de logging (`INFO`, `DEBUG`, etc.).
+- `APP_ENV`: Entorno (`development`, `local`, etc.).
+- `LOG_LEVEL`: Nivel de detalle del logging (`INFO`, `DEBUG`, etc.).
 
-### 4. Arrancar el servidor de desarrollo
+### 3. Instalación de dependencias
 
+Sincroniza el entorno virtual y las dependencias (incluidas las de desarrollo):
+
+```bash
+uv sync
+```
+
+### 4. Instalación de navegadores para Playwright
+
+Para habilitar las pruebas End-to-End (E2E), instala los binarios de los navegadores gestionados por Playwright:
+
+```bash
+uv run playwright install
+```
+
+*(Opcional)* Si estás en Linux y necesitas instalar dependencias del sistema operativo para los navegadores:
+
+```bash
+uv run playwright install --with-deps
+```
+
+### 5. Arranque de los servicios en desarrollo
+
+#### Backend (API FastAPI)
 Inicia la API con recarga automática en caliente:
 
 ```bash
 uv run uvicorn app.main:app --reload
 ```
+- **Endpoint base:** `http://127.0.0.1:8000`
+- **Health Check:** `http://127.0.0.1:8000/health`
+- **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-El servidor estará escuchando por defecto en `http://127.0.0.1:8000`.
-
-### 5. Interfaz de chat Streamlit
-
-Inicia la interfaz de chat con:
+#### Frontend (Chat Streamlit)
+Inicia la interfaz web interactiva en una nueva terminal:
 
 ```bash
 uv run streamlit run app/streamlit_app.py
 ```
+- **Interfaz web:** `http://127.0.0.1:8501`
 
-La interfaz conserva el historial durante la sesión, usa el mismo servicio y system prompt CAG que el endpoint HTTP y carga `OPENAI_API_KEY` desde `.env`. No incluyas la clave directamente en el código.
+### 6. Suite de Pruebas (Testing)
 
-### 6. Verificación y uso
-
-- **Comprobación de salud (Health check):**
-  ```bash
-  curl http://127.0.0.1:8000/health
-  ```
-- **Documentación interactiva (Swagger UI):**
-  Disponible en el navegador en [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
-- **Petición de estimación de ejemplo:**
-  ```bash
-  curl -X POST http://127.0.0.1:8000/api/v1/estimate \
-    -H 'Content-Type: application/json' \
-    -d '{"transcription":"El cliente necesita un portal para consultar pedidos y descargar facturas."}'
-  ```
-
-## Documentación y pruebas
-
-La arquitectura prevista y el estado actual se describen en [docs/architecture.md](docs/architecture.md). Las tecnologías están en [docs/technology.md](docs/technology.md), y la elección de FastAPI en [ADR-001](docs/decisions/ADR-001-fastapi.md).
-
-La validación automática está en [`.github/workflows/ci.yml`](.github/workflows/ci.yml). En cada push a `main` y en cada pull request, GitHub Actions instala las dependencias fijadas en `uv.lock` y ejecuta las pruebas de `tests/`. Estas comprueban que existen los archivos obligatorios, que `/health` y `POST /api/v1/estimate` cumplen el contrato, y que el servicio envía el contexto CAG y la transcripción a la API Responses. La llamada a OpenAI se simula, así que el pipeline no necesita `OPENAI_API_KEY` ni incurre en costes. Para ejecutar las mismas pruebas en tu terminal:
+#### Pruebas unitarias y de integración
+Ejecuta todas las pruebas unitarias y de integración con `pytest`:
 
 ```bash
-uv sync --locked
-uv run --no-sync python -m unittest discover -s tests -v
+uv run pytest tests/test_*.py -v
 ```
 
-Una ejecución correcta de CI verifica el código y el contrato local; no confirma que las credenciales o el proveedor externo estén disponibles en producción.
+#### Pruebas End-to-End (E2E) con Playwright
+Las pruebas de navegador verifican la interfaz Streamlit y los flujos integrados:
+
+- **Ejecución en modo headless (por defecto, para terminal y CI):**
+  ```bash
+  uv run pytest tests/e2e -v
+  ```
+- **Ejecución con navegador visible (modo headed / interactivo):**
+  ```bash
+  uv run pytest tests/e2e --headed
+  ```
+- **Ejecución con captura de trazas (Trace Viewer para depurar):**
+  ```bash
+  uv run pytest tests/e2e --tracing=on
+  ```
+- **Generador interactivo de código de Playwright:**
+  ```bash
+  uv run playwright codegen http://127.0.0.1:8501
+  ```
+
+#### Comprobación de tipos estáticos (Pyright)
+Verifica el tipado estricto en `app/` y `tests/`:
+
+```bash
+uv run --no-sync pyright
+```
+
+## Documentación y decisiones de arquitectura
+
+- Estado actual de la arquitectura: [docs/architecture-state.md](docs/architecture-state.md)
+- Elección de framework HTTP: [docs/decisions/ADR-001-fastapi.md](docs/decisions/ADR-001-fastapi.md)
+- Elección de framework E2E Playwright: [docs/decisions/ADR-002-playwright-e2e.md](docs/decisions/ADR-002-playwright-e2e.md)
+
+La validación automática continua se define en [.github/workflows/ci.yml](.github/workflows/ci.yml). En cada push a `main` y en cada pull request, GitHub Actions instala las dependencias fijadas en `uv.lock`, comprueba `app/` y `tests/` con Pyright en modo estricto y ejecuta la suite de pruebas automatizadas con dobles de prueba para OpenAI.

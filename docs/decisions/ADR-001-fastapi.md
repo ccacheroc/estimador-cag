@@ -6,7 +6,7 @@
 
 El estimador CAG expondrá una API que recibe la transcripción de una reunión, incorpora ejemplos de estimaciones al prompt y consulta un LLM externo. La espera de esa respuesta es I/O de red y puede ser mucho más larga que el trabajo local de validación o serialización. La latencia y la concurrencia reales dependerán del proveedor, el modelo, la carga y el despliegue; este proyecto aún no tiene mediciones.
 
-El repositorio usa Python, declara FastAPI, Pydantic Settings y el SDK de OpenAI, y separa `app/main.py`, `routers/`, `services/` y `context/`. Un prototipo en un único `main.py` podría mezclar endpoint HTTP, configuración del cliente, prompt, llamada LLM y formato de respuesta. Esa mezcla dificultaría añadir proveedores, probar el prompt o cambiar el contrato de la API. La [arquitectura prevista](../architecture.md) asigna cada responsabilidad a una capa.
+El repositorio usa Python, declara FastAPI, Pydantic Settings y el SDK de OpenAI, y separa `app/main.py`, `routers/`, `services/` y `context/`. Un prototipo en un único `main.py` podría mezclar endpoint HTTP, configuración del cliente, prompt, llamada LLM y formato de respuesta. Esa mezcla dificultaría añadir proveedores, probar el prompt o cambiar el contrato de la API. El [estado de la arquitectura](../architecture-state.md) refleja la asignación actual de responsabilidades.
 
 ## Decisión
 

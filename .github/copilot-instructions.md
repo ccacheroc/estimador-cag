@@ -1,6 +1,6 @@
-Canonical operational content lives in `/.agents/`.
+Canonical operational content lives in `/.harness/`.
 
-Use `/.agents/manifest.yaml` to locate:
+Use `/.harness/manifest.yaml` to locate:
 
 - rules
 - skills
@@ -11,4 +11,4 @@ Use `/.agents/manifest.yaml` to locate:
 
 Do not duplicate long project instructions here.
 
-If this file conflicts with `/AGENTS.md` or `/.agents/`, treat `/AGENTS.md` and `/.agents/` as canonical.
+If this file conflicts with `/AGENTS.md` or `/.harness/`, treat `/AGENTS.md` and `/.harness/` as canonical.

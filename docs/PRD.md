@@ -209,6 +209,38 @@ La API HTTP de la primera fase CAG: health check, recepción de una transcripci�
 - Given tarifas conocidas y uso disponible, When se devuelve la estimación, Then `estimated_cost_usd` es no negativo y orientativo.
 - Given uso ausente, When se devuelve la estimación, Then los metadatos de uso y coste pueden ser `null`.
 
+### REQ-API-ERRORS-001 — Devolver errores HTTP estables
+
+**Status:** Active
+
+**Actor:** Consumidor de la API.
+
+**Problem / Job:** Necesita distinguir y gestionar errores sin interpretar
+mensajes humanos ni depender de detalles internos del framework o proveedor.
+
+**Expected outcome:** Todo error HTTP con cuerpo usa un contrato estable RFC
+9457 y el media type `application/problem+json`.
+
+**Requirement:** La API debe devolver `type`, `title`, `status` y `detail` en
+los errores. Los errores de validación deben añadir una extensión `errors` con
+ubicación y código procesables por máquina. El contrato OpenAPI debe declarar
+los errores `422`, `500`, `502` y `503` de `POST /api/v1/estimate`.
+
+**Priority:** Core
+
+**Acceptance criteria:**
+
+- Given una petición inválida, When FastAPI la rechaza, Then responde `422`
+  con Problem Details y no reproduce el valor de la transcripción.
+- Given una configuración no utilizable, When se solicita una estimación,
+  Then responde `503` con un tipo de problema estable.
+- Given un fallo del proveedor, When no puede generarse la estimación, Then
+  responde `502` sin exponer el error crudo del proveedor.
+- Given un fallo inesperado, When la API no puede completar la petición, Then
+  responde `500`, registra la excepción y no expone sus detalles internos.
+- Given cualquiera de esos errores, When un consumidor consulta OpenAPI, Then
+  encuentra únicamente `application/problem+json` con su esquema asociado.
+
 ### REQ-STREAMLIT-001 — Conversación de estimación en Streamlit
 
 **Status:** Active
@@ -319,15 +351,23 @@ Respuesta `200` con la estimación y los metadatos disponibles.
 
 ### Validation error
 
-Respuesta `422` cuando falta la transcripción o está vacía.
+Respuesta `422` cuando falta la transcripción o está vacía. El cuerpo usa
+Problem Details e incluye la extensión `errors`.
 
 ### Configuration error
 
-Respuesta `503` cuando el proveedor, la API key, el modelo o sus tarifas no son utilizables.
+Respuesta `503` con Problem Details cuando el proveedor, la API key, el modelo
+o sus tarifas no son utilizables.
 
 ### Provider error
 
-Respuesta `502` cuando OpenAI falla o no devuelve texto utilizable.
+Respuesta `502` con Problem Details cuando OpenAI falla o no devuelve texto
+utilizable. No se expone el error crudo del proveedor.
+
+### Unexpected error
+
+Respuesta `500` con Problem Details ante un fallo no previsto. El detalle es
+genérico y la excepción se conserva únicamente en el log del servidor.
 
 ### Streamlit chat
 
@@ -424,6 +464,7 @@ No hay conclusiones legales en el repositorio. Debe revisarse el tratamiento de 
 - **DEC-2026-09-17-002 — Contexto CAG estático:** La primera fase usa cuatro ejemplos sintéticos definidos en código; RAG queda para una fase posterior.
 - **DEC-2026-09-17-003 — Proveedor inicial OpenAI:** El servicio admite actualmente `openai` y exige tarifas explícitas para el modelo configurado.
 - **DEC-2026-09-17-004 — Interfaz Streamlit sobre el servicio existente:** El chat reutiliza `generate_estimation_details` para mantener el mismo prompt CAG, configuración y gestión de credenciales que la API HTTP.
+- **DEC-2026-09-19-005 — Errores HTTP con Problem Details:** La API usa RFC 9457 y `application/problem+json` para ofrecer errores estables y documentados en OpenAPI.
 
 Estas decisiones reflejan el estado observable del repositorio; las decisiones de producto aún no confirmadas permanecen como supuestos u open questions.
 
@@ -433,3 +474,4 @@ Estas decisiones reflejan el estado observable del repositorio; las decisiones d
 |---|---|---|---|
 | 2026-09-17 | Creación del PRD inicial a partir de README, arquitectura, código y tests existentes. | REQ-ESTIMATION-001, REQ-ESTIMATION-002, REQ-ESTIMATION-003, REQ-HEALTH-001 | Establecer una fuente de intención de producto y separar comportamiento implementado de trabajo futuro. |
 | 2026-09-17 | Incorporación de una interfaz de chat Streamlit con historial de sesión y reutilización del servicio CAG. | REQ-STREAMLIT-001 | Facilitar la introducción interactiva de transcripciones sin duplicar el prompt ni las credenciales. |
+| 2026-09-19 | Adopción de RFC 9457 para errores HTTP y publicación de `422`, `500`, `502` y `503` en OpenAPI. | REQ-API-ERRORS-001 | Ofrecer a los consumidores un contrato de error estable, seguro y procesable. |

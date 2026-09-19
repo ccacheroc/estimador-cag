@@ -5,7 +5,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from app.streamlit_app import _generate_estimation
+# This focused test intentionally exercises the UI adapter's private sync bridge.
+from app.streamlit_app import _generate_estimation  # pyright: ignore[reportPrivateUsage]
 
 
 class StreamlitAppTests(unittest.TestCase):
