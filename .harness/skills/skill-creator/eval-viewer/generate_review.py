@@ -16,12 +16,8 @@ import argparse
 import base64
 import json
 import mimetypes
-import os
 import re
-import signal
-import subprocess
 import sys
-import time
 import webbrowser
 from functools import partial
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -276,7 +272,14 @@ def generate_html(
     if benchmark:
         embedded["benchmark"] = benchmark
 
-    data_json = json.dumps(embedded)
+    data_json = (
+        json.dumps(embedded)
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
 
     return template.replace("/*__EMBEDDED_DATA__*/", f"const EMBEDDED_DATA = {data_json};")
 
@@ -284,26 +287,6 @@ def generate_html(
 # ---------------------------------------------------------------------------
 # HTTP server (stdlib only, zero dependencies)
 # ---------------------------------------------------------------------------
-
-def _kill_port(port: int) -> None:
-    """Kill any process listening on the given port."""
-    try:
-        result = subprocess.run(
-            ["lsof", "-ti", f":{port}"],
-            capture_output=True, text=True, timeout=5,
-        )
-        for pid_str in result.stdout.strip().split("\n"):
-            if pid_str.strip():
-                try:
-                    os.kill(int(pid_str.strip()), signal.SIGTERM)
-                except (ProcessLookupError, ValueError):
-                    pass
-        if result.stdout.strip():
-            time.sleep(0.5)
-    except subprocess.TimeoutExpired:
-        pass
-    except FileNotFoundError:
-        print("Note: lsof not found, cannot check if port is in use", file=sys.stderr)
 
 class ReviewHandler(BaseHTTPRequestHandler):
     """Serves the review HTML and handles feedback saves.
@@ -343,6 +326,11 @@ class ReviewHandler(BaseHTTPRequestHandler):
             content = html.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+                "script-src 'self' 'unsafe-inline'; img-src 'self' data:;",
+            )
             self.send_header("Content-Length", str(len(content)))
             self.end_headers()
             self.wfile.write(content)
@@ -401,6 +389,9 @@ def main() -> None:
         "--static", "-s", type=Path, default=None,
         help="Write standalone HTML to this path instead of starting a server",
     )
+    parser.add_argument(
+        "--open", action="store_true", help="Open the local viewer in a browser"
+    )
     args = parser.parse_args()
 
     workspace = args.workspace.resolve()
@@ -435,14 +426,12 @@ def main() -> None:
         print(f"\n  Static viewer written to: {args.static}\n")
         sys.exit(0)
 
-    # Kill any existing process on the target port
     port = args.port
-    _kill_port(port)
     handler = partial(ReviewHandler, workspace, skill_name, feedback_path, previous, benchmark_path)
     try:
         server = HTTPServer(("127.0.0.1", port), handler)
     except OSError:
-        # Port still in use after kill attempt — find a free one
+        # Never terminate an unrelated process; use an ephemeral port instead.
         server = HTTPServer(("127.0.0.1", 0), handler)
         port = server.server_address[1]
 
@@ -458,7 +447,8 @@ def main() -> None:
         print(f"  Benchmark: {benchmark_path}")
     print(f"\n  Press Ctrl+C to stop.\n")
 
-    webbrowser.open(url)
+    if args.open:
+        webbrowser.open(url)
 
     try:
         server.serve_forever()

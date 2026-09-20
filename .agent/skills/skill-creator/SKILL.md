@@ -1,9 +1,9 @@
 ---
 name: skill-creator
-description: "Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy."
+description: Crea, modifica, valida y optimiza skills portables para agentes de codificación. Úsala al diseñar una skill, mejorar una existente, comprobar su activación o comportamiento, comparar versiones, reducir acoplamientos de proveedor o preparar una skill para distribución.
 ---
 
-# skill-creator (Antigravity Bridge)
+# Puente de skill-creator
 
 Antes de ejecutar esta skill, consulta y sigue las instrucciones canónicas en:
 [.harness/skills/skill-creator/SKILL.md](../../../.harness/skills/skill-creator/SKILL.md)

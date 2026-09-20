@@ -8,6 +8,7 @@ description: >-
   sistemáticamente la documentación técnica antes de cualquier commit o push.
 skills:
   - ponytail
+  - developing-with-streamlit
 ---
 
 # Frontend Developer

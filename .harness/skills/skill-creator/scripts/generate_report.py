@@ -148,7 +148,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
 <body>
     <h1>""" + title_prefix + """Skill Description Optimization</h1>
     <div class="explainer">
-        <strong>Optimizing your skill's description.</strong> This page updates automatically as Claude tests different versions of your skill's description. Each row is an iteration — a new description attempt. The columns show test queries: green checkmarks mean the skill triggered correctly (or correctly didn't trigger), red crosses mean it got it wrong. The "Train" score shows performance on queries used to improve the description; the "Test" score shows performance on held-out queries the optimizer hasn't seen. When it's done, Claude will apply the best-performing description to your skill.
+        <strong>Optimizing your skill's description.</strong> This page updates as the configured runner tests different versions. Each row is an iteration. Green checkmarks indicate correct activation decisions; red crosses indicate errors. "Train" shows the queries used for improvement and "Test" shows held-out queries. The workflow selects the best validated description.
     </div>
 """]
 

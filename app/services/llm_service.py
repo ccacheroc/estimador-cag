@@ -1,14 +1,24 @@
 """Construcción del prompt CAG y generación de estimaciones con OpenAI."""
 
+import time
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from textwrap import dedent
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, OpenAI
 
 from app.config import TOKENS_PER_MILLION, get_model_rates, get_settings
 from app.context.examples import ESTIMATION_EXAMPLES
+
+
+@dataclass(frozen=True)
+class StreamMetrics:
+    model: str
+    input_tokens: int
+    output_tokens: int
+    duration_seconds: float
 
 
 @dataclass(frozen=True)
@@ -67,6 +77,69 @@ async def generate_estimation(transcription: str) -> str:
     """Devuelve solo el campo de texto del objeto EstimationResult que devuelve la función generate_estimation_details."""
     result = await generate_estimation_details(transcription)
     return result.estimation
+
+
+def generate_estimation_stream(
+    transcription: str,
+    on_metrics: Callable[[StreamMetrics], None] | None = None,
+) -> Iterator[str]:
+    """Transmite fragmentos de texto de la estimación en tiempo real token a token."""
+    if not transcription.strip():
+        raise ValueError("La transcripción no puede estar vacía.")
+
+    settings = get_settings()
+    if settings.llm_provider.strip().lower() != "openai":
+        raise ValueError("Este servicio solo admite el proveedor OpenAI.")
+
+    api_key = (
+        settings.openai_api_key.get_secret_value()
+        if settings.openai_api_key is not None
+        else None
+    )
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY debe estar configurada para usar OpenAI.")
+
+    model = settings.llm_model.strip()
+    if not model:
+        raise ValueError("LLM_MODEL debe estar configurado para usar OpenAI.")
+    get_model_rates(model)
+
+    start_time = time.perf_counter()
+    input_tokens = 0
+    output_tokens = 0
+
+    with OpenAI(api_key=api_key) as client:
+        stream = client.responses.create(
+            model=model,
+            input=[
+                {"role": "system", "content": build_system_prompt()},
+                {"role": "user", "content": transcription},
+            ],
+            stream=True,
+        )
+        for event in stream:
+            event_type = getattr(event, "type", None)
+            if event_type == "response.output_text.delta":
+                delta = getattr(event, "delta", "")
+                if delta:
+                    yield str(delta)
+            elif event_type == "response.completed":
+                response_obj = getattr(event, "response", None)
+                usage = getattr(response_obj, "usage", None) or getattr(event, "usage", None)
+                if usage is not None:
+                    input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+                    output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+
+    if on_metrics is not None:
+        duration_seconds = round(time.perf_counter() - start_time, 2)
+        on_metrics(
+            StreamMetrics(
+                model=model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                duration_seconds=duration_seconds,
+            )
+        )
 
 
 async def generate_estimation_details(transcription: str) -> EstimationResult:

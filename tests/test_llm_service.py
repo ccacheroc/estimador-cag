@@ -2,12 +2,16 @@
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from pydantic import SecretStr
 
 from app.context.examples import ESTIMATION_EXAMPLES
-from app.services.llm_service import generate_estimation_details
+from app.services.llm_service import (
+    StreamMetrics,
+    generate_estimation_details,
+    generate_estimation_stream,
+)
 
 
 class FakeOpenAIClient:
@@ -19,6 +23,18 @@ class FakeOpenAIClient:
         return self
 
     async def __aexit__(self, *_args: object) -> None:
+        return None
+
+
+class FakeSyncOpenAIClient:
+    def __init__(self, *, api_key: str) -> None:
+        self.api_key = api_key
+        self.responses = SimpleNamespace(create=MagicMock())
+
+    def __enter__(self) -> "FakeSyncOpenAIClient":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
         return None
 
 
@@ -67,6 +83,108 @@ class LlmServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tokens_used.cached_input_tokens, 100)
         self.assertEqual(result.estimated_cost_usd, 0.0002625)
         self.assertEqual(result.response_id, "resp_test")
+
+    def test_generate_estimation_stream_yields_deltas(self) -> None:
+        settings = SimpleNamespace(
+            llm_provider="openai",
+            llm_model="gpt-4o-mini",
+            openai_api_key=SecretStr("test-key"),
+        )
+        fake_events = [
+            SimpleNamespace(type="response.created"),
+            SimpleNamespace(type="response.output_text.delta", delta="Estimación "),
+            SimpleNamespace(type="response.output_text.delta", delta="en "),
+            SimpleNamespace(type="response.output_text.delta", delta="tiempo real."),
+            SimpleNamespace(type="response.completed"),
+        ]
+        client = FakeSyncOpenAIClient(api_key="test-key")
+        client.responses.create.return_value = fake_events
+
+        with (
+            patch("app.services.llm_service.get_settings", return_value=settings),
+            patch("app.services.llm_service.OpenAI", return_value=client) as sdk,
+        ):
+            chunks = list(generate_estimation_stream("Transcripción de reunión"))
+
+        sdk.assert_called_once_with(api_key="test-key")
+        client.responses.create.assert_called_once()
+        kwargs = client.responses.create.call_args.kwargs
+        self.assertTrue(kwargs.get("stream"))
+        self.assertEqual(kwargs["model"], "gpt-4o-mini")
+        self.assertEqual(chunks, ["Estimación ", "en ", "tiempo real."])
+
+    def test_generate_estimation_stream_reports_metrics_when_callback_provided(self) -> None:
+        settings = SimpleNamespace(
+            llm_provider="openai",
+            llm_model="gpt-4o-mini",
+            openai_api_key=SecretStr("test-key"),
+        )
+        fake_events = [
+            SimpleNamespace(type="response.created"),
+            SimpleNamespace(type="response.output_text.delta", delta="Texto generado"),
+            SimpleNamespace(
+                type="response.completed",
+                response=SimpleNamespace(
+                    usage=SimpleNamespace(input_tokens=120, output_tokens=35),
+                ),
+            ),
+        ]
+        client = FakeSyncOpenAIClient(api_key="test-key")
+        client.responses.create.return_value = fake_events
+
+        captured_metrics: list[StreamMetrics] = []
+
+        with (
+            patch("app.services.llm_service.get_settings", return_value=settings),
+            patch("app.services.llm_service.OpenAI", return_value=client),
+        ):
+            chunks = list(
+                generate_estimation_stream(
+                    "Transcripción con métricas",
+                    on_metrics=captured_metrics.append,
+                )
+            )
+
+        self.assertEqual(chunks, ["Texto generado"])
+        self.assertEqual(len(captured_metrics), 1)
+        metric = captured_metrics[0]
+        self.assertEqual(metric.model, "gpt-4o-mini")
+        self.assertEqual(metric.input_tokens, 120)
+        self.assertEqual(metric.output_tokens, 35)
+        self.assertGreaterEqual(metric.duration_seconds, 0.0)
+
+    def test_generate_estimation_stream_reports_default_tokens_if_no_usage(self) -> None:
+        settings = SimpleNamespace(
+            llm_provider="openai",
+            llm_model="gpt-4o-mini",
+            openai_api_key=SecretStr("test-key"),
+        )
+        fake_events = [
+            SimpleNamespace(type="response.output_text.delta", delta="Texto"),
+            SimpleNamespace(type="response.completed", response=None),
+        ]
+        client = FakeSyncOpenAIClient(api_key="test-key")
+        client.responses.create.return_value = fake_events
+
+        captured_metrics: list[StreamMetrics] = []
+
+        with (
+            patch("app.services.llm_service.get_settings", return_value=settings),
+            patch("app.services.llm_service.OpenAI", return_value=client),
+        ):
+            list(
+                generate_estimation_stream(
+                    "Transcripción sin usage",
+                    on_metrics=captured_metrics.append,
+                )
+            )
+
+        self.assertEqual(len(captured_metrics), 1)
+        metric = captured_metrics[0]
+        self.assertEqual(metric.input_tokens, 0)
+        self.assertEqual(metric.output_tokens, 0)
+        self.assertEqual(metric.model, "gpt-4o-mini")
+        self.assertGreaterEqual(metric.duration_seconds, 0.0)
 
 
 if __name__ == "__main__":

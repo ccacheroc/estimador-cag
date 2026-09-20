@@ -14,6 +14,10 @@ import fnmatch
 import sys
 import zipfile
 from pathlib import Path
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    
 from scripts.quick_validate import validate_skill
 
 # Patterns to exclude when packaging skills.
@@ -21,7 +25,8 @@ EXCLUDE_DIRS = {"__pycache__", "node_modules"}
 EXCLUDE_GLOBS = {"*.pyc"}
 EXCLUDE_FILES = {".DS_Store"}
 # Directories excluded only at the skill root (not when nested deeper).
-ROOT_EXCLUDE_DIRS = {"evals"}
+ROOT_EXCLUDE_DIRS = {"benchmarks", "evals", "tests"}
+SECRET_NAMES = {".env", ".env.local", "credentials.json", "secrets.json"}
 
 
 def should_exclude(rel_path: Path) -> bool:
@@ -34,6 +39,8 @@ def should_exclude(rel_path: Path) -> bool:
     if len(parts) > 1 and parts[1] in ROOT_EXCLUDE_DIRS:
         return True
     name = rel_path.name
+    if name in SECRET_NAMES or name.endswith((".key", ".pem", ".p12")):
+        return True
     if name in EXCLUDE_FILES:
         return True
     return any(fnmatch.fnmatch(name, pat) for pat in EXCLUDE_GLOBS)
@@ -67,9 +74,9 @@ def package_skill(skill_path, output_dir=None):
         print(f"❌ Error: SKILL.md not found in {skill_path}")
         return None
 
-    # Run validation before packaging
+    # Run portable validation before packaging.
     print("🔍 Validating skill...")
-    valid, message = validate_skill(skill_path)
+    valid, message = validate_skill(skill_path, portable=True)
     if not valid:
         print(f"❌ Validation failed: {message}")
         print("   Please fix the validation errors before packaging.")
@@ -90,13 +97,19 @@ def package_skill(skill_path, output_dir=None):
     try:
         with zipfile.ZipFile(skill_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
             # Walk through the skill directory, excluding build artifacts
-            for file_path in skill_path.rglob('*'):
+            for file_path in sorted(skill_path.rglob('*')):
                 if not file_path.is_file():
                     continue
                 arcname = file_path.relative_to(skill_path.parent)
                 if should_exclude(arcname):
                     print(f"  Skipped: {arcname}")
                     continue
+                if file_path.is_symlink():
+                    try:
+                        file_path.resolve().relative_to(skill_path)
+                    except ValueError:
+                        print(f"❌ Refusing external symlink: {file_path}")
+                        return None
                 zipf.write(file_path, arcname)
                 print(f"  Added: {arcname}")
 

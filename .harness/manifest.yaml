@@ -111,10 +111,16 @@ inventory:
       description: Enruta implementación mínima, revisión, auditoría, deuda, benchmark y ayuda de Ponytail.
     - id: skill-creator
       path: .harness/skills/skill-creator/SKILL.md
-      description: Creación, mejora y evaluación de skills de Codex.
+      description: Creación, mejora, evaluación y optimización de skills portables para agentes de codificación.
     - id: product-owner-prd
       path: .harness/skills/product-owner-prd/SKILL.md
       description: Creación, revisión, actualización y reconciliación de PRD con producto, código y tests.
+    - id: developing-with-streamlit
+      path: .harness/skills/developing-with-streamlit/SKILL.md
+      description: Guía de desarrollo, componentes, rendimiento y estilos para aplicaciones Streamlit.
+      applies_to:
+        - frontend_development
+        - ui_design
   agents:
     - id: product-strategy-analyst
       path: .harness/agents/product-strategy-analyst.md

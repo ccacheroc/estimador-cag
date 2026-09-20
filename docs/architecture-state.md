@@ -1,6 +1,6 @@
 # Estado actual de la arquitectura
 
-**Fecha de verificación:** 2026-09-19
+**Fecha de verificación:** 2026-09-20
 
 **Alcance:** estructura y comportamiento observables en el repositorio. Este
 documento describe el estado implementado; las convenciones que guían su
@@ -18,11 +18,11 @@ End-to-End de navegador se documenta en
 El sistema ofrece dos entradas ejecutables para el mismo caso de uso:
 
 - una API HTTP FastAPI con `GET /health` y `POST /api/v1/estimate`;
-- una interfaz de chat Streamlit con historial durante la sesión.
+- una interfaz de chat Streamlit con historial durante la sesión y panel lateral de inspección CAG (system prompt en solo lectura, contexto de ejemplos inyectados y métricas de la última llamada).
 
 Ambas entradas reutilizan el servicio de estimación. Este construye un prompt
-con cuatro ejemplos CAG estáticos, consulta de forma asíncrona la API Responses
-de OpenAI y devuelve la estimación con metadatos de modelo, uso y coste. No hay
+con cuatro ejemplos CAG estáticos, consulta la API Responses
+de OpenAI y devuelve la estimación con metadatos de modelo, uso y coste (o en tiempo real vía streaming con captura de métricas). No hay
 persistencia, autenticación, autorización, RAG ni orquestación de agentes.
 
 ## C4: diagrama de contenedores
@@ -34,7 +34,7 @@ C4Container
     Person(user, "Solicitante", "Introduce una transcripción y consulta la estimación")
 
     System_Boundary(cag, "Estimador CAG") {
-        Container(web, "Chat", "Streamlit / Python", "Interfaz interactiva con historial de sesión")
+        Container(web, "Chat", "Streamlit / Python", "Interfaz interactiva con historial de sesión e inspección de contexto CAG")
         Container(api, "API HTTP", "FastAPI / Python", "Expone salud y estimaciones versionadas")
     }
 
@@ -59,9 +59,9 @@ C4Component
     Container_Boundary(app, "Paquete app") {
         Component(composition, "Composición API", "FastAPI", "Crea la aplicación y registra rutas")
         Component(router, "Adaptador HTTP", "APIRouter", "Valida, delega y traduce errores")
-        Component(ui, "Adaptador de presentación", "Streamlit", "Gestiona el chat y el estado de sesión")
+        Component(ui, "Adaptador de presentación", "Streamlit", "Gestiona el chat, panel de inspección CAG y métricas")
         Component(contracts, "Contratos", "Pydantic", "Modelos de petición, respuesta y uso")
-        Component(service, "Servicio de estimación", "Python / AsyncOpenAI", "Construye el prompt, llama al proveedor y calcula metadatos")
+        Component(service, "Servicio de estimación", "Python / AsyncOpenAI / OpenAI", "Construye prompt, llama a proveedor, emite streaming y reporta métricas")
         Component(context, "Contexto CAG", "Datos Python", "Cuatro ejemplos sintéticos")
         Component(config, "Configuración", "Pydantic Settings", "Variables de entorno y tarifas por modelo")
     }
@@ -85,8 +85,8 @@ C4Component
 | Transporte HTTP | [`app/routers/estimations.py`](../app/routers/estimations.py) | Expone `/estimate`, delega en el servicio y traduce errores a `502` o `503` |
 | Contratos | [`app/schemas/`](../app/schemas/) | Valida la transcripción y serializa respuestas satisfactorias y Problem Details |
 | Errores HTTP | [`app/http_errors.py`](../app/http_errors.py) | Convierte validación y excepciones HTTP a RFC 9457 y normaliza su OpenAPI |
-| Presentación web | [`app/streamlit_app.py`](../app/streamlit_app.py) | Chat, historial de sesión, progreso y errores de usuario |
-| Caso de uso e integración LLM | [`app/services/llm_service.py`](../app/services/llm_service.py) | Construye el prompt, usa `AsyncOpenAI` y calcula coste y uso |
+| Presentación web | [`app/streamlit_app.py`](../app/streamlit_app.py) | Chat, historial de sesión, panel lateral con inspección CAG (system prompt, ejemplos) y métricas de la última llamada (modelo, tokens, tiempo) |
+| Caso de uso e integración LLM | [`app/services/llm_service.py`](../app/services/llm_service.py) | Construye el prompt, usa `AsyncOpenAI`/`OpenAI`, emite streaming con callback de métricas (`StreamMetrics`) y calcula coste y uso |
 | Contexto CAG | [`app/context/examples.py`](../app/context/examples.py) | Contiene cuatro estimaciones sintéticas incorporadas al prompt |
 | Configuración | [`app/config.py`](../app/config.py) | Lee entorno y `.env`, y registra tarifas de `gpt-4o-mini` |
 
@@ -109,11 +109,13 @@ C4Component
 
 ### Chat Streamlit
 
-1. La interfaz recupera el historial desde `st.session_state`.
-2. El usuario introduce una transcripción mediante `st.chat_input`.
-3. La interfaz ejecuta el mismo servicio asíncrono mediante un adaptador
-   síncrono local y muestra progreso durante la espera.
-4. La estimación o el error se muestran como respuesta del asistente y se
+1. La interfaz renderiza el panel lateral (`st.sidebar`) con las métricas de la última estimación (o mensaje informativo inicial), el system prompt activo en solo lectura y los ejemplos CAG inyectados.
+2. La interfaz recupera el historial desde `st.session_state`.
+3. El usuario introduce una transcripción mediante `st.chat_input`.
+4. La interfaz consume la estimación en tiempo real token a token
+   mediante `generate_estimation_stream` y `st.write_stream`.
+5. Al completarse la respuesta del stream, el callback `on_metrics` actualiza `StreamMetrics` en `st.session_state` y refresca inmediatamente el contenedor de métricas en el panel lateral.
+6. La estimación o el error se muestran como respuesta del asistente y se
    incorporan al historial de la sesión.
 
 La interfaz no llama al endpoint FastAPI: ambos adaptadores importan el mismo

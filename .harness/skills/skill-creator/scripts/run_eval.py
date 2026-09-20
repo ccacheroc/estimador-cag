@@ -1,35 +1,68 @@
 #!/usr/bin/env python3
-"""Run trigger evaluation for a skill description.
+"""Evaluate skill triggering through a provider-neutral runner protocol."""
 
-Tests whether a skill's description causes Claude to trigger (read the skill)
-for a set of queries. Outputs results as JSON.
-"""
+
+from __future__ import annotations
 
 import argparse
 import json
-import os
-import select
 import subprocess
 import sys
-import time
-import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+from typing import TypedDict, cast
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts.utils import parse_skill_md
 
 
-def find_project_root() -> Path:
-    """Find the project root by walking up from cwd looking for .claude/.
+class EvalItem(TypedDict):
+    """One trigger-evaluation query."""
 
-    Mimics how Claude Code discovers its project root, so the command file
-    we create ends up where claude -p will look for it.
-    """
-    current = Path.cwd()
-    for parent in [current, *current.parents]:
-        if (parent / ".claude").is_dir():
-            return parent
+    id: str
+    query: str
+    should_trigger: bool
+
+
+def find_project_root() -> Path:
+    """Find the nearest repository root using portable project markers."""
+    current = Path.cwd().resolve()
+    for candidate in (current, *current.parents):
+        if (candidate / "AGENTS.md").is_file():
+            return candidate
+        if (candidate / ".harness" / "manifest.yaml").is_file():
+            return candidate
+        if (candidate / ".git").exists():
+            return candidate
     return current
+
+
+def load_runner_command(
+    runner_config: Path | None,
+    runner_command_json: str | None,
+) -> list[str]:
+    """Load a shell-free runner command from exactly one source."""
+    if bool(runner_config) == bool(runner_command_json):
+        raise ValueError(
+            "Provide exactly one of --runner-config or --runner-command-json"
+        )
+
+    raw: object
+    if runner_config is not None:
+        parsed = json.loads(runner_config.read_text())
+        if not isinstance(parsed, dict):
+            raise ValueError("Runner config must be a JSON object")
+        raw = parsed.get("command")
+    else:
+        raw = json.loads(cast(str, runner_command_json))
+
+    if not isinstance(raw, list) or not raw or not all(
+        isinstance(argument, str) and argument for argument in raw
+    ):
+        raise ValueError("Runner command must be a non-empty JSON string array")
+    return cast(list[str], raw)
 
 
 def run_single_query(
@@ -37,272 +70,206 @@ def run_single_query(
     skill_name: str,
     skill_description: str,
     timeout: int,
-    project_root: str,
+    skill_path: str,
+    runner_command: list[str],
     model: str | None = None,
 ) -> bool:
-    """Run a single query and return whether the skill was triggered.
-
-    Creates a command file in .claude/commands/ so it appears in Claude's
-    available_skills list, then runs `claude -p` with the raw query.
-    Uses --include-partial-messages to detect triggering early from
-    stream events (content_block_start) rather than waiting for the
-    full assistant message, which only arrives after tool execution.
-    """
-    unique_id = uuid.uuid4().hex[:8]
-    clean_name = f"{skill_name}-skill-{unique_id}"
-    project_commands_dir = Path(project_root) / ".claude" / "commands"
-    command_file = project_commands_dir / f"{clean_name}.md"
+    """Return whether an external runner reports that the skill triggered."""
+    request = {
+        "schema_version": "1.0",
+        "operation": "evaluate_trigger",
+        "query": query,
+        "skill": {
+            "name": skill_name,
+            "description": skill_description,
+            "path": str(Path(skill_path).resolve()),
+        },
+        "model": model,
+    }
+    result = subprocess.run(
+        runner_command,
+        input=json.dumps(request),
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+    if result.returncode != 0:
+        diagnostic = result.stderr.strip() or "no diagnostic output"
+        raise RuntimeError(
+            f"Runner exited with status {result.returncode}: {diagnostic}"
+        )
 
     try:
-        project_commands_dir.mkdir(parents=True, exist_ok=True)
-        # Use YAML block scalar to avoid breaking on quotes in description
-        indented_desc = "\n  ".join(skill_description.split("\n"))
-        command_content = (
-            f"---\n"
-            f"description: |\n"
-            f"  {indented_desc}\n"
-            f"---\n\n"
-            f"# {skill_name}\n\n"
-            f"This skill handles: {skill_description}\n"
-        )
-        command_file.write_text(command_content)
-
-        cmd = [
-            "claude",
-            "-p", query,
-            "--output-format", "stream-json",
-            "--verbose",
-            "--include-partial-messages",
-        ]
-        if model:
-            cmd.extend(["--model", model])
-
-        # Remove CLAUDECODE env var to allow nesting claude -p inside a
-        # Claude Code session. The guard is for interactive terminal conflicts;
-        # programmatic subprocess usage is safe.
-        env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            cwd=project_root,
-            env=env,
-        )
-
-        triggered = False
-        start_time = time.time()
-        buffer = ""
-        # Track state for stream event detection
-        pending_tool_name = None
-        accumulated_json = ""
-
-        try:
-            while time.time() - start_time < timeout:
-                if process.poll() is not None:
-                    remaining = process.stdout.read()
-                    if remaining:
-                        buffer += remaining.decode("utf-8", errors="replace")
-                    break
-
-                ready, _, _ = select.select([process.stdout], [], [], 1.0)
-                if not ready:
-                    continue
-
-                chunk = os.read(process.stdout.fileno(), 8192)
-                if not chunk:
-                    break
-                buffer += chunk.decode("utf-8", errors="replace")
-
-                while "\n" in buffer:
-                    line, buffer = buffer.split("\n", 1)
-                    line = line.strip()
-                    if not line:
-                        continue
-
-                    try:
-                        event = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-
-                    # Early detection via stream events
-                    if event.get("type") == "stream_event":
-                        se = event.get("event", {})
-                        se_type = se.get("type", "")
-
-                        if se_type == "content_block_start":
-                            cb = se.get("content_block", {})
-                            if cb.get("type") == "tool_use":
-                                tool_name = cb.get("name", "")
-                                if tool_name in ("Skill", "Read"):
-                                    pending_tool_name = tool_name
-                                    accumulated_json = ""
-                                else:
-                                    return False
-
-                        elif se_type == "content_block_delta" and pending_tool_name:
-                            delta = se.get("delta", {})
-                            if delta.get("type") == "input_json_delta":
-                                accumulated_json += delta.get("partial_json", "")
-                                if clean_name in accumulated_json:
-                                    return True
-
-                        elif se_type in ("content_block_stop", "message_stop"):
-                            if pending_tool_name:
-                                return clean_name in accumulated_json
-                            if se_type == "message_stop":
-                                return False
-
-                    # Fallback: full assistant message
-                    elif event.get("type") == "assistant":
-                        message = event.get("message", {})
-                        for content_item in message.get("content", []):
-                            if content_item.get("type") != "tool_use":
-                                continue
-                            tool_name = content_item.get("name", "")
-                            tool_input = content_item.get("input", {})
-                            if tool_name == "Skill" and clean_name in tool_input.get("skill", ""):
-                                triggered = True
-                            elif tool_name == "Read" and clean_name in tool_input.get("file_path", ""):
-                                triggered = True
-                            return triggered
-
-                    elif event.get("type") == "result":
-                        return triggered
-        finally:
-            # Clean up process on any exit path (return, exception, timeout)
-            if process.poll() is None:
-                process.kill()
-                process.wait()
-
-        return triggered
-    finally:
-        if command_file.exists():
-            command_file.unlink()
+        response = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError("Runner did not return valid JSON") from error
+    if not isinstance(response, dict) or not isinstance(
+        response.get("triggered"), bool
+    ):
+        raise RuntimeError("Runner response must contain boolean 'triggered'")
+    return cast(bool, response["triggered"])
 
 
 def run_eval(
-    eval_set: list[dict],
+    eval_set: list[EvalItem],
     skill_name: str,
     description: str,
     num_workers: int,
     timeout: int,
-    project_root: Path,
+    skill_path: Path,
+    runner_command: list[str],
     runs_per_query: int = 1,
     trigger_threshold: float = 0.5,
     model: str | None = None,
-) -> dict:
-    """Run the full eval set and return results."""
-    results = []
+) -> dict[str, object]:
+    """Run an evaluation set and aggregate trigger rates by stable ID."""
+    trigger_results: dict[str, list[bool | None]] = {
+        item["id"]: [] for item in eval_set
+    }
+    items_by_id = {item["id"]: item for item in eval_set}
 
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        future_to_info = {}
+        future_to_id = {}
         for item in eval_set:
-            for run_idx in range(runs_per_query):
+            for _ in range(runs_per_query):
                 future = executor.submit(
                     run_single_query,
                     item["query"],
                     skill_name,
                     description,
                     timeout,
-                    str(project_root),
+                    str(skill_path),
+                    runner_command,
                     model,
                 )
-                future_to_info[future] = (item, run_idx)
+                future_to_id[future] = item["id"]
 
-        query_triggers: dict[str, list[bool]] = {}
-        query_items: dict[str, dict] = {}
-        for future in as_completed(future_to_info):
-            item, _ = future_to_info[future]
-            query = item["query"]
-            query_items[query] = item
-            if query not in query_triggers:
-                query_triggers[query] = []
+        for future in as_completed(future_to_id):
+            item_id = future_to_id[future]
             try:
-                query_triggers[query].append(future.result())
-            except Exception as e:
-                print(f"Warning: query failed: {e}", file=sys.stderr)
-                query_triggers[query].append(False)
+                trigger_results[item_id].append(future.result())
+            except Exception as error:
+                print(f"Warning: eval {item_id} failed: {error}", file=sys.stderr)
+                trigger_results[item_id].append(None)
 
-    for query, triggers in query_triggers.items():
-        item = query_items[query]
-        trigger_rate = sum(triggers) / len(triggers)
+    results: list[dict[str, object]] = []
+    for item_id, outcomes in trigger_results.items():
+        item = items_by_id[item_id]
+        valid = [outcome for outcome in outcomes if outcome is not None]
+        errors = len(outcomes) - len(valid)
+        trigger_rate = sum(valid) / len(valid) if valid else None
         should_trigger = item["should_trigger"]
-        if should_trigger:
-            did_pass = trigger_rate >= trigger_threshold
-        else:
-            did_pass = trigger_rate < trigger_threshold
-        results.append({
-            "query": query,
-            "should_trigger": should_trigger,
-            "trigger_rate": trigger_rate,
-            "triggers": sum(triggers),
-            "runs": len(triggers),
-            "pass": did_pass,
-        })
+        passed = False
+        if trigger_rate is not None and errors == 0:
+            passed = (
+                trigger_rate >= trigger_threshold
+                if should_trigger
+                else trigger_rate < trigger_threshold
+            )
+        results.append(
+            {
+                "id": item_id,
+                "query": item["query"],
+                "should_trigger": should_trigger,
+                "trigger_rate": trigger_rate,
+                "triggers": sum(valid),
+                "runs": len(valid),
+                "errors": errors,
+                "pass": passed,
+            }
+        )
 
-    passed = sum(1 for r in results if r["pass"])
-    total = len(results)
-
+    passed_count = sum(1 for result in results if result["pass"])
     return {
         "skill_name": skill_name,
         "description": description,
         "results": results,
         "summary": {
-            "total": total,
-            "passed": passed,
-            "failed": total - passed,
+            "total": len(results),
+            "passed": passed_count,
+            "failed": len(results) - passed_count,
         },
     }
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Run trigger evaluation for a skill description")
-    parser.add_argument("--eval-set", required=True, help="Path to eval set JSON file")
-    parser.add_argument("--skill-path", required=True, help="Path to skill directory")
-    parser.add_argument("--description", default=None, help="Override description to test")
-    parser.add_argument("--num-workers", type=int, default=10, help="Number of parallel workers")
-    parser.add_argument("--timeout", type=int, default=30, help="Timeout per query in seconds")
-    parser.add_argument("--runs-per-query", type=int, default=3, help="Number of runs per query")
-    parser.add_argument("--trigger-threshold", type=float, default=0.5, help="Trigger rate threshold")
-    parser.add_argument("--model", default=None, help="Model to use for claude -p (default: user's configured model)")
-    parser.add_argument("--verbose", action="store_true", help="Print progress to stderr")
+def _parse_eval_set(path: Path) -> list[EvalItem]:
+    """Validate and normalize a trigger evaluation set."""
+    raw = json.loads(path.read_text())
+    if not isinstance(raw, list) or not raw:
+        raise ValueError("Eval set must be a non-empty JSON array")
+
+    items: list[EvalItem] = []
+    seen_ids: set[str] = set()
+    for index, value in enumerate(raw):
+        if not isinstance(value, dict):
+            raise ValueError(f"Eval item {index} must be a JSON object")
+        item_id = str(value.get("id", index))
+        query = value.get("query")
+        should_trigger = value.get("should_trigger")
+        if item_id in seen_ids:
+            raise ValueError(f"Duplicate eval id: {item_id}")
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError(f"Eval {item_id} requires a non-empty query")
+        if not isinstance(should_trigger, bool):
+            raise ValueError(f"Eval {item_id} requires boolean should_trigger")
+        seen_ids.add(item_id)
+        items.append(
+            {"id": item_id, "query": query, "should_trigger": should_trigger}
+        )
+    return items
+
+
+def main() -> None:
+    """Run trigger evaluation from the command line."""
+    parser = argparse.ArgumentParser(
+        description="Run trigger evaluation through an external runner"
+    )
+    parser.add_argument("--eval-set", required=True, type=Path)
+    parser.add_argument("--skill-path", required=True, type=Path)
+    parser.add_argument("--runner-config", type=Path)
+    parser.add_argument("--runner-command-json")
+    parser.add_argument("--description")
+    parser.add_argument("--num-workers", type=int, default=4)
+    parser.add_argument("--timeout", type=int, default=60)
+    parser.add_argument("--runs-per-query", type=int, default=3)
+    parser.add_argument("--trigger-threshold", type=float, default=0.5)
+    parser.add_argument("--model")
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
-    eval_set = json.loads(Path(args.eval_set).read_text())
-    skill_path = Path(args.skill_path)
-
+    skill_path = args.skill_path.resolve()
     if not (skill_path / "SKILL.md").exists():
-        print(f"Error: No SKILL.md found at {skill_path}", file=sys.stderr)
-        sys.exit(1)
+        parser.error(f"No SKILL.md found at {skill_path}")
 
-    name, original_description, content = parse_skill_md(skill_path)
-    description = args.description or original_description
-    project_root = find_project_root()
+    try:
+        eval_set = _parse_eval_set(args.eval_set)
+        runner_command = load_runner_command(
+            args.runner_config, args.runner_command_json
+        )
+    except (json.JSONDecodeError, OSError, ValueError) as error:
+        parser.error(str(error))
 
-    if args.verbose:
-        print(f"Evaluating: {description}", file=sys.stderr)
-
+    name, original_description, _ = parse_skill_md(skill_path)
     output = run_eval(
         eval_set=eval_set,
         skill_name=name,
-        description=description,
+        description=args.description or original_description,
         num_workers=args.num_workers,
         timeout=args.timeout,
-        project_root=project_root,
+        skill_path=skill_path,
+        runner_command=runner_command,
         runs_per_query=args.runs_per_query,
         trigger_threshold=args.trigger_threshold,
         model=args.model,
     )
 
     if args.verbose:
-        summary = output["summary"]
-        print(f"Results: {summary['passed']}/{summary['total']} passed", file=sys.stderr)
-        for r in output["results"]:
-            status = "PASS" if r["pass"] else "FAIL"
-            rate_str = f"{r['triggers']}/{r['runs']}"
-            print(f"  [{status}] rate={rate_str} expected={r['should_trigger']}: {r['query'][:70]}", file=sys.stderr)
-
+        summary = cast(dict[str, int], output["summary"])
+        print(
+            f"Results: {summary['passed']}/{summary['total']} passed",
+            file=sys.stderr,
+        )
     print(json.dumps(output, indent=2))
 
 

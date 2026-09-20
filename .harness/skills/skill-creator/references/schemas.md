@@ -4,6 +4,31 @@ This document defines the JSON schemas used by skill-creator.
 
 ---
 
+## trigger-evals.json
+
+Define casos para medir si la descripción activa la skill correctamente. Es un
+contrato distinto de `evals.json`, que evalúa resultados de tareas.
+
+```json
+[
+  {
+    "id": "positive-create",
+    "query": "Create a portable skill for reviewing database migrations",
+    "should_trigger": true
+  },
+  {
+    "id": "negative-review",
+    "query": "Review this migration without creating a reusable skill",
+    "should_trigger": false
+  }
+]
+```
+
+`id` debe ser único. Los errores o timeouts del runner se registran como
+`errors` y nunca cuentan como una decisión negativa correcta.
+
+---
+
 ## evals.json
 
 Defines the evals for a skill. Located at `evals/evals.json` within the skill directory.
@@ -198,11 +223,13 @@ Output from the executor agent. Located at `<run-dir>/outputs/metrics.json`.
 
 Wall clock timing for a run. Located at `<run-dir>/timing.json`.
 
-**How to capture:** When a subagent task completes, the task notification includes `total_tokens` and `duration_ms`. Save these immediately — they are not persisted anywhere else and cannot be recovered after the fact.
+**How to capture:** Record only values exposed by the current runner. Hosts may
+omit token usage, duration, tool calls or model identifiers; represent missing
+values as `null` instead of estimating them.
 
 ```json
 {
-  "total_tokens": 84852,
+  "total_tokens": null,
   "duration_ms": 23332,
   "total_duration_seconds": 23.3,
   "executor_start": "2026-01-15T10:30:00Z",
@@ -225,8 +252,9 @@ Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.
   "metadata": {
     "skill_name": "pdf",
     "skill_path": "/path/to/pdf",
-    "executor_model": "claude-sonnet-4-20250514",
-    "analyzer_model": "most-capable-model",
+    "executor_model": "optional-model-id",
+    "analyzer_model": null,
+    "runner": "configured-runner-id",
     "timestamp": "2026-01-15T10:30:00Z",
     "evals_run": [1, 2, 3],
     "runs_per_configuration": 3
@@ -236,7 +264,7 @@ Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.
     {
       "eval_id": 1,
       "eval_name": "Ocean",
-      "configuration": "with_skill",
+      "configuration": "candidate",
       "run_number": 1,
       "result": {
         "pass_rate": 0.85,
@@ -244,7 +272,7 @@ Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.
         "failed": 1,
         "total": 7,
         "time_seconds": 42.5,
-        "tokens": 3800,
+        "tokens": null,
         "tool_calls": 18,
         "errors": 0
       },
@@ -259,12 +287,12 @@ Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.
   ],
 
   "run_summary": {
-    "with_skill": {
+    "candidate": {
       "pass_rate": {"mean": 0.85, "stddev": 0.05, "min": 0.80, "max": 0.90},
       "time_seconds": {"mean": 45.0, "stddev": 12.0, "min": 32.0, "max": 58.0},
       "tokens": {"mean": 3800, "stddev": 400, "min": 3200, "max": 4100}
     },
-    "without_skill": {
+    "baseline": {
       "pass_rate": {"mean": 0.35, "stddev": 0.08, "min": 0.28, "max": 0.45},
       "time_seconds": {"mean": 32.0, "stddev": 8.0, "min": 24.0, "max": 42.0},
       "tokens": {"mean": 2100, "stddev": 300, "min": 1800, "max": 2500}
@@ -294,11 +322,13 @@ Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.
 - `runs[]`: Individual run results
   - `eval_id`: Numeric eval identifier
   - `eval_name`: Human-readable eval name (used as section header in the viewer)
-  - `configuration`: Must be `"with_skill"` or `"without_skill"` (the viewer uses this exact string for grouping and color coding)
+- `configuration`: Use `"candidate"` or `"baseline"`. Legacy values may be
+  read for compatibility, but new workspaces use the canonical names.
   - `run_number`: Integer run number (1, 2, 3...)
   - `result`: Nested object with `pass_rate`, `passed`, `total`, `time_seconds`, `tokens`, `errors`
 - `run_summary`: Statistical aggregates per configuration
-  - `with_skill` / `without_skill`: Each contains `pass_rate`, `time_seconds`, `tokens` objects with `mean` and `stddev` fields
+- `candidate` / `baseline`: Each contains `pass_rate`, `time_seconds`, and
+  optional `tokens` objects with `mean` and `stddev` fields
   - `delta`: Difference strings like `"+0.50"`, `"+13.0"`, `"+1700"`
 - `notes`: Freeform observations from the analyzer
 

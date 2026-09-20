@@ -1,103 +1,117 @@
 #!/usr/bin/env python3
-"""
-Quick validation script for skills - minimal version
-"""
+"""Validate the portable Agent Skills core without third-party dependencies."""
 
-import sys
-import os
+from __future__ import annotations
+
+import argparse
 import re
-import yaml
+import sys
 from pathlib import Path
 
-def validate_skill(skill_path):
-    """Basic validation of a skill"""
-    skill_path = Path(skill_path)
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-    # Check SKILL.md exists
-    skill_md = skill_path / 'SKILL.md'
-    if not skill_md.exists():
+from scripts.utils import parse_skill_md
+
+NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+MARKDOWN_LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+PROVIDER_FRONTMATTER_KEYS = {
+    "agent",
+    "background",
+    "context",
+    "disable-model-invocation",
+    "effort",
+    "hooks",
+    "model",
+    "paths",
+    "shell",
+    "user-invocable",
+    "when_to_use",
+}
+
+
+def _frontmatter_keys(content: str) -> set[str]:
+    """Extract top-level frontmatter keys from a valid skill document."""
+    lines = content.splitlines()
+    closing = next(
+        (index for index, line in enumerate(lines[1:], start=1) if line == "---"),
+        None,
+    )
+    if closing is None:
+        return set()
+    keys: set[str] = set()
+    for line in lines[1:closing]:
+        if line and not line[0].isspace() and ":" in line:
+            keys.add(line.split(":", 1)[0].strip())
+    return keys
+
+
+def _broken_relative_links(skill_path: Path, content: str) -> list[str]:
+    """Return missing local Markdown references from SKILL.md."""
+    broken: list[str] = []
+    for target in MARKDOWN_LINK_PATTERN.findall(content):
+        clean_target = target.split("#", 1)[0].strip()
+        if not clean_target or "://" in clean_target or clean_target.startswith("#"):
+            continue
+        path = Path(clean_target)
+        if path.is_absolute() or not (skill_path / path).exists():
+            broken.append(target)
+    return broken
+
+
+def validate_skill(skill_path: str | Path, portable: bool = False) -> tuple[bool, str]:
+    """Validate required metadata, naming and optional portability constraints."""
+    path = Path(skill_path).resolve()
+    skill_file = path / "SKILL.md"
+    if not skill_file.is_file():
         return False, "SKILL.md not found"
 
-    # Read and validate frontmatter
-    content = skill_md.read_text()
-    if not content.startswith('---'):
-        return False, "No YAML frontmatter found"
-
-    # Extract frontmatter
-    match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
-    if not match:
-        return False, "Invalid frontmatter format"
-
-    frontmatter_text = match.group(1)
-
-    # Parse YAML frontmatter
     try:
-        frontmatter = yaml.safe_load(frontmatter_text)
-        if not isinstance(frontmatter, dict):
-            return False, "Frontmatter must be a YAML dictionary"
-    except yaml.YAMLError as e:
-        return False, f"Invalid YAML in frontmatter: {e}"
+        name, description, content = parse_skill_md(path)
+    except (OSError, ValueError) as error:
+        return False, str(error)
 
-    # Define allowed properties
-    ALLOWED_PROPERTIES = {'name', 'description', 'license', 'allowed-tools', 'metadata', 'compatibility'}
+    if not name:
+        return False, "Name must be a non-empty string"
+    if not NAME_PATTERN.fullmatch(name):
+        return False, "Name must use lowercase letters, digits, and single hyphens"
+    if len(name) > 64:
+        return False, "Name must not exceed 64 characters"
+    if name != path.name:
+        return False, f"Name '{name}' must match directory '{path.name}'"
 
-    # Check for unexpected properties (excluding nested keys under metadata)
-    unexpected_keys = set(frontmatter.keys()) - ALLOWED_PROPERTIES
-    if unexpected_keys:
-        return False, (
-            f"Unexpected key(s) in SKILL.md frontmatter: {', '.join(sorted(unexpected_keys))}. "
-            f"Allowed properties are: {', '.join(sorted(ALLOWED_PROPERTIES))}"
-        )
+    if not description:
+        return False, "Description must be a non-empty string"
+    if len(description) > 1024:
+        return False, "Description must not exceed 1024 characters"
+    if "<" in description or ">" in description:
+        return False, "Description cannot contain angle brackets"
 
-    # Check required fields
-    if 'name' not in frontmatter:
-        return False, "Missing 'name' in frontmatter"
-    if 'description' not in frontmatter:
-        return False, "Missing 'description' in frontmatter"
+    broken_links = _broken_relative_links(path, content)
+    if broken_links:
+        return False, f"Broken or non-portable local links: {', '.join(broken_links)}"
 
-    # Extract name for validation
-    name = frontmatter.get('name', '')
-    if not isinstance(name, str):
-        return False, f"Name must be a string, got {type(name).__name__}"
-    name = name.strip()
-    if name:
-        # Check naming convention (kebab-case: lowercase with hyphens)
-        if not re.match(r'^[a-z0-9-]+$', name):
-            return False, f"Name '{name}' should be kebab-case (lowercase letters, digits, and hyphens only)"
-        if name.startswith('-') or name.endswith('-') or '--' in name:
-            return False, f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens"
-        # Check name length (max 64 characters per spec)
-        if len(name) > 64:
-            return False, f"Name is too long ({len(name)} characters). Maximum is 64 characters."
+    if portable:
+        unsupported = sorted(_frontmatter_keys(content) & PROVIDER_FRONTMATTER_KEYS)
+        if unsupported:
+            return False, (
+                "Provider-specific frontmatter is not portable: "
+                + ", ".join(unsupported)
+            )
 
-    # Extract and validate description
-    description = frontmatter.get('description', '')
-    if not isinstance(description, str):
-        return False, f"Description must be a string, got {type(description).__name__}"
-    description = description.strip()
-    if description:
-        # Check for angle brackets
-        if '<' in description or '>' in description:
-            return False, "Description cannot contain angle brackets (< or >)"
-        # Check description length (max 1024 characters per spec)
-        if len(description) > 1024:
-            return False, f"Description is too long ({len(description)} characters). Maximum is 1024 characters."
+    return True, "Skill is structurally valid and portable" if portable else "Skill is valid"
 
-    # Validate compatibility field if present (optional)
-    compatibility = frontmatter.get('compatibility', '')
-    if compatibility:
-        if not isinstance(compatibility, str):
-            return False, f"Compatibility must be a string, got {type(compatibility).__name__}"
-        if len(compatibility) > 500:
-            return False, f"Compatibility is too long ({len(compatibility)} characters). Maximum is 500 characters."
 
-    return True, "Skill is valid!"
+def main() -> None:
+    """Validate one skill directory."""
+    parser = argparse.ArgumentParser(description="Validate an Agent Skill")
+    parser.add_argument("skill_directory", type=Path)
+    parser.add_argument("--portable", action="store_true")
+    args = parser.parse_args()
+    valid, message = validate_skill(args.skill_directory, portable=args.portable)
+    print(message)
+    raise SystemExit(0 if valid else 1)
+
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python quick_validate.py <skill_directory>")
-        sys.exit(1)
-    
-    valid, message = validate_skill(sys.argv[1])
-    print(message)
-    sys.exit(0 if valid else 1)
+    main()
