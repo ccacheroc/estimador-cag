@@ -69,7 +69,7 @@ Antes de proceder a la validación de código o commit, el agente **MUST** ejecu
    > *"Tras el push de la rama `<rama-actual>`, he calculado el tag sugerido `<tag-sugerido>` (ej. `inicio-sesion-04`) con el mensaje 'Punto de partida correcto para la Sesión <NN+1>'. ¿Deseas mantener este nombre o prefieres uno distinto?"*
 3. Tras la confirmación o el ajuste del nombre por parte del usuario, crear la etiqueta anotada y subirla al repositorio remoto:
    ```bash
-   git tag -a <nombre-tag> <rama-actual> -m "<mensaje-tag>"
+   git tag -a <nombre-tag> -m "<mensaje-tag>"
    git push origin <nombre-tag>
    ```
 
