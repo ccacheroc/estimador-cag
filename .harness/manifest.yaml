@@ -93,7 +93,7 @@ inventory:
         - session_start
     - id: cerrar-sesion
       path: .harness/workflows/cerrar-sesion.md
-      description: Finalizar sesión con commit, push y PR opcional.
+      description: Finalizar sesión con commit, push, creación de tag y PR opcional.
       applies_to:
         - session_end
   skills:

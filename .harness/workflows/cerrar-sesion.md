@@ -1,5 +1,5 @@
 ---
-description: Workflow para finalizar una sesión de trabajo sobre un requisito, asegurando commits, push a la rama remota y apertura opcional de Pull Request.
+description: Workflow para finalizar una sesión de trabajo sobre un requisito, asegurando commits, push a la rama remota, creación y subida de etiqueta (tag) y apertura opcional de Pull Request.
 ---
 
 # Workflow: Cerrar Sesión (`/cerrar-sesion`)
@@ -7,7 +7,7 @@ description: Workflow para finalizar una sesión de trabajo sobre un requisito, 
 Este workflow se ejecuta al concluir una sesión de desarrollo de un requisito.
 
 ## Objetivo
-Verificar que todo el trabajo pendiente quede validado mediante tests, debidamente confirmado en Git, subido al repositorio remoto y opcionalmente preparado como Pull Request.
+Verificar que todo el trabajo pendiente quede validado mediante tests, debidamente confirmado en Git, subido al repositorio remoto, etiquetado con un tag de inicio para la siguiente sesión y opcionalmente preparado como Pull Request.
 
 ## Procedimiento Paso a Paso
 
@@ -60,7 +60,20 @@ Antes de proceder a la validación de código o commit, el agente **MUST** ejecu
    git push -u origin <rama-actual>
    ```
 
-### Paso 5: Preguntar por creación de Pull Request
+### Paso 5: Creación y subida de etiqueta (tag)
+1. Calcular el nombre sugerido para el tag a partir de la rama actual:
+   - Si el nombre de la rama referencia una sesión (por ejemplo `sesion03` o `<prefijo>/sesion03`), sugerir el tag correspondiente al punto de partida de la siguiente sesión: `inicio-sesion-04` (o `inicio-sesion-<NN+1>`).
+   - El mensaje por defecto del tag anotado será: `"Punto de partida correcto para la Sesión <NN+1>"` (ej. `"Punto de partida correcto para la Sesión 04"`).
+   - Si la rama no sigue este patrón, derivar un tag semántico adecuado o consultar directamente al usuario.
+2. Preguntar explícitamente al usuario:
+   > *"Tras el push de la rama `<rama-actual>`, he calculado el tag sugerido `<tag-sugerido>` (ej. `inicio-sesion-04`) con el mensaje 'Punto de partida correcto para la Sesión <NN+1>'. ¿Deseas mantener este nombre o prefieres uno distinto?"*
+3. Tras la confirmación o el ajuste del nombre por parte del usuario, crear la etiqueta anotada y subirla al repositorio remoto:
+   ```bash
+   git tag -a <nombre-tag> <rama-actual> -m "<mensaje-tag>"
+   git push origin <nombre-tag>
+   ```
+
+### Paso 6: Preguntar por creación de Pull Request
 1. Preguntar explícitamente al usuario:
    > *"¿Deseas crear un Pull Request hacia main para esta rama?"*
 2. Si el usuario responde **SÍ**:
@@ -72,9 +85,10 @@ Antes de proceder a la validación de código o commit, el agente **MUST** ejecu
 3. Si el usuario responde **NO**:
    - Informar de que la rama ha quedado subida al repositorio remoto sin crear PR.
 
-### Paso 6: Resumen final
+### Paso 7: Resumen final
 1. Informar al usuario de:
    - Estado final del repositorio.
    - Rama remota actualizada.
+   - Etiqueta creada y subida a origin (`<nombre-tag>`).
    - Estado del Pull Request (creado o declinado).
    - Fin de la sesión de trabajo.
