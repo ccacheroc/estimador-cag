@@ -88,12 +88,12 @@ inventory:
   workflows:
     - id: abrir-sesion
       path: .harness/workflows/abrir-sesion.md
-      description: Iniciar nuevo requisito con commit/push previo, PR opcional y creación de rama.
+      description: Integrar la sesión anterior, publicar su tag de inicio y abrir la nueva rama.
       applies_to:
         - session_start
     - id: cerrar-sesion
       path: .harness/workflows/cerrar-sesion.md
-      description: Finalizar sesión con commit, push, creación de tag y PR opcional.
+      description: Validar, confirmar y subir la sesión actual sin integrarla ni etiquetarla.
       applies_to:
         - session_end
   skills:

@@ -1,94 +1,64 @@
 ---
-description: Workflow para finalizar una sesión de trabajo sobre un requisito, asegurando commits, push a la rama remota, creación y subida de etiqueta (tag) y apertura opcional de Pull Request.
+description: Validar, confirmar y subir el trabajo de la sesión actual.
 ---
 
 # Workflow: Cerrar Sesión (`/cerrar-sesion`)
 
-Este workflow se ejecuta al concluir una sesión de desarrollo de un requisito.
-
 ## Objetivo
-Verificar que todo el trabajo pendiente quede validado mediante tests, debidamente confirmado en Git, subido al repositorio remoto, etiquetado con un tag de inicio para la siguiente sesión y opcionalmente preparado como Pull Request.
 
-## Procedimiento Paso a Paso
+Dejar validado, confirmado y subido el trabajo de la sesión actual, sin
+integrar automáticamente la rama en `main` ni crear tags.
 
-### Paso 1: Comprobar el estado del repositorio
-1. Ejecutar `git status` para detectar cualquier cambio no confirmado o archivos pendientes.
+## Procedimiento
 
-### Paso 2: Revisión sistemática de documentación técnica afectada
-Antes de proceder a la validación de código o commit, el agente **MUST** ejecutar una revisión paso a paso de los cambios recientes (`git status` y `git diff`) y contrastarlos contra la documentación técnica del repositorio:
+### 1. Revisar el estado y la documentación
 
-1. **Estado de la arquitectura (`docs/architecture-state.md`):**
-   - Comprobar si los cambios alteran componentes, flujos, contratos entre capas, límites del sistema, dependencias externas o tecnologías empleadas.
-   - Si se modificó la estructura del sistema o del stack, actualizar `docs/architecture-state.md` reflejando el estado observable actual.
-2. **Decisiones de arquitectura (`docs/decisions/ADR-*.md`):**
-   - Comprobar si se ha introducido, reemplazado o descartado una tecnología principal, framework, biblioteca de infraestructura o patrón estructural relevante.
-   - Si aplica y no existe ADR previo, redactar el correspondiente `docs/decisions/ADR-XXX-<tema>.md` con contexto, alternativas consideradas y consecuencias.
-3. **Contratos HTTP y OpenAPI (`app/http_errors.py`, `app/routers/`, `app/schemas/`):**
-   - Comprobar si se han añadido o modificado endpoints, códigos de estado, esquemas Pydantic de entrada/salida o contratos RFC 9457 de error.
-   - Asegurar que la documentación OpenAPI autogenerada y las referencias en la documentación reflejen los contratos actualizados.
-4. **Guía de desarrollo y dependencias (`README.md`, `pyproject.toml`):**
-   - Comprobar si han variado las instrucciones de instalación, dependencias añadidas/eliminadas, comandos de arranque local, variables de entorno (`.env.example`) o suites de prueba.
-   - Actualizar `README.md` para mantener absoluta sincronía con el estado real de ejecución del proyecto.
-5. **Reglas y especificaciones agénticas (`.harness/`):**
-   - Comprobar si los cambios requieren actualizar o sincronizar reglas en `.harness/rules/` o registrar nuevos artefactos en `.harness/manifest.yaml`.
-   - Ejecutar la verificación de no-contradicción y consistencia según `.harness/rules/ai-specs-and-rule-evolution.md`.
-6. **Informe de verificación de documentación:**
-   - Registrar y detallar qué ficheros de documentación han sido revisados, cuáles han requerido actualización y qué cambios se han aplicado.
+1. Ejecutar:
 
-### Paso 3: Validación y Commit de cambios
-1. Si hay cambios pendientes:
-   - Ejecutar la comprobación de tipos estáticos:
-     ```bash
-     uv run --no-sync pyright
-     ```
-   - Ejecutar la suite de pruebas del proyecto:
-     ```bash
-     uv run pytest
-     ```
-   - Si las comprobaciones o tests fallan, detener el workflow e informar al usuario para corregir los errores.
-   - Si todo pasa correctamente, añadir y commitear todos los cambios (código y documentación actualizada):
-     ```bash
-     git add .
-     git commit -m "<mensaje descriptivo y trazable de la sesión>"
-     ```
-2. Si el directorio de trabajo ya estaba limpio, informar de que no hay cambios pendientes de commit.
+   ```bash
+   git branch --show-current
+   git status
+   git diff
+   ```
 
-### Paso 4: Push al repositorio remoto
-1. Identificar la rama actual (`git branch --show-current`).
-2. Subir la rama actual con seguimiento de upstream:
+2. Confirmar que los cambios pertenecen a la sesión actual. No añadir
+   indiscriminadamente ficheros ajenos o generados.
+3. Revisar y actualizar, cuando proceda, `docs/architecture-state.md`, los ADR,
+   `README.md`, `.env.example` y las especificaciones de `.harness/` afectadas.
+4. Si cambia `.harness/`, ejecutar `governance-check` antes de confirmar los
+   cambios.
+
+### 2. Validar
+
+1. Ejecutar:
+
+   ```bash
+   uv run --no-sync pyright
+   uv run pytest
+   ```
+
+2. Si alguna comprobación falla, detenerse e informar del resultado. No crear
+   el commit ni hacer push de cambios no validados.
+
+### 3. Confirmar los cambios
+
+1. Si hay cambios pendientes, seleccionar explícitamente los ficheros que
+   pertenecen a la sesión y solicitar la confirmación exigida por
+   `.harness/rules/task-change-commit-prompt.md` antes de crear el commit.
+2. Crear un commit con un mensaje descriptivo y trazable en español.
+3. Si no hay cambios pendientes, informar de ello y continuar.
+
+### 4. Publicar la rama
+
+1. Subir la rama actual, tenga o no commits nuevos desde el último push:
+
    ```bash
    git push -u origin <rama-actual>
    ```
 
-### Paso 5: Creación y subida de etiqueta (tag)
-1. Calcular el nombre sugerido para el tag a partir de la rama actual:
-   - Si el nombre de la rama referencia una sesión (por ejemplo `sesion03` o `<prefijo>/sesion03`), sugerir el tag correspondiente al punto de partida de la siguiente sesión: `inicio-sesion-04` (o `inicio-sesion-<NN+1>`).
-   - El mensaje por defecto del tag anotado será: `"Punto de partida correcto para la Sesión <NN+1>"` (ej. `"Punto de partida correcto para la Sesión 04"`).
-   - Si la rama no sigue este patrón, derivar un tag semántico adecuado o consultar directamente al usuario.
-2. Preguntar explícitamente al usuario:
-   > *"Tras el push de la rama `<rama-actual>`, he calculado el tag sugerido `<tag-sugerido>` (ej. `inicio-sesion-04`) con el mensaje 'Punto de partida correcto para la Sesión <NN+1>'. ¿Deseas mantener este nombre o prefieres uno distinto?"*
-3. Tras la confirmación o el ajuste del nombre por parte del usuario, crear la etiqueta anotada y subirla al repositorio remoto:
-   ```bash
-   git tag -a <nombre-tag> -m "<mensaje-tag>"
-   git push origin <nombre-tag>
-   ```
+2. Informar de la rama, el último commit, el resultado de las validaciones y
+   el estado del push.
 
-### Paso 6: Preguntar por creación de Pull Request
-1. Preguntar explícitamente al usuario:
-   > *"¿Deseas crear un Pull Request hacia main para esta rama?"*
-2. Si el usuario responde **SÍ**:
-   - Crear el Pull Request usando `gh` CLI si está instalado:
-     ```bash
-     gh pr create --base main --head <rama-actual> --fill
-     ```
-   - O bien proporcionar el enlace directo de GitHub para abrirlo desde el navegador.
-3. Si el usuario responde **NO**:
-   - Informar de que la rama ha quedado subida al repositorio remoto sin crear PR.
-
-### Paso 7: Resumen final
-1. Informar al usuario de:
-   - Estado final del repositorio.
-   - Rama remota actualizada.
-   - Etiqueta creada y subida a origin (`<nombre-tag>`).
-   - Estado del Pull Request (creado o declinado).
-   - Fin de la sesión de trabajo.
+Este workflow **MUST NOT** crear un Pull Request ni un tag. La integración en
+`main` y el punto de partida recuperable de la siguiente sesión pertenecen a
+`/abrir-sesion`.

@@ -1,58 +1,103 @@
 ---
-description: Workflow para iniciar el trabajo en un nuevo requisito, asegurando commits y push de cambios pendientes, creación opcional de PR y apertura de una nueva rama.
+description: Integrar la sesión anterior, fijar el estado inicial de la nueva sesión y abrir su rama.
 ---
 
 # Workflow: Abrir Sesión (`/abrir-sesion`)
 
-Este workflow se ejecuta cada vez que el usuario va a comenzar un nuevo requisito de desarrollo.
-
 ## Objetivo
-Asegurar que el repositorio quede limpio y sincronizado antes de comenzar, gestionar la subida y posible Pull Request de los cambios previos, y preparar una nueva rama de trabajo para el nuevo requisito.
 
-## Procedimiento Paso a Paso
+Integrar en `main` el trabajo validado de la sesión anterior y crear, sobre
+el mismo commit, un tag recuperable y la rama de trabajo de la nueva sesión.
 
-### Paso 1: Comprobar el estado del repositorio
-1. Ejecutar `git status` para comprobar si existen cambios locales sin confirmar (staged, unstaged o untracked).
+## Entradas necesarias
 
-### Paso 2: Validación y Commit de cambios pendientes (si los hay)
-1. Si hay cambios pendientes:
-   - Ejecutar la suite de pruebas del proyecto según el stack definido:
-     ```bash
-     uv run python -m unittest discover -s tests -v
-     ```
-   - Si los tests fallan, detener el workflow e informar al usuario para resolverlos antes de continuar.
-   - Si los tests pasan correctamente, preparar los cambios y realizar el commit:
-     ```bash
-     git add .
-     git commit -m "<mensaje descriptivo de los cambios realizados>"
-     ```
-   - Hacer push a la rama actual en el repositorio remoto:
-     ```bash
-     git push origin <rama-actual>
-     ```
-2. Si no hay cambios pendientes, continuar al Paso 3.
+- Rama de la sesión anterior.
+- Número de la nueva sesión con dos dígitos (`NN`).
+- Nombre de la nueva rama, por defecto `<usuario>/sesionNN`.
 
-### Paso 3: Preguntar por creación de Pull Request
-1. Preguntar explícitamente al usuario:
-   > *"¿Deseas abrir un Pull Request con los cambios realizados hasta el momento?"*
-2. Si el usuario responde **SÍ**:
-   - Comprobar si `gh` CLI está disponible o si se cuenta con la herramienta adecuada.
-   - Si está disponible, ejecutar `gh pr create --fill` o con título/descripción adecuados.
-   - Si no está disponible, proporcionar el enlace web directo al repositorio en GitHub para abrir el PR.
-3. Si el usuario responde **NO**:
-   - Continuar directamente al Paso 4.
+Si alguna entrada no puede deducirse sin ambigüedad, el agente **MUST**
+preguntarla antes de cambiar el repositorio.
 
-### Paso 4: Solicitar el nombre del nuevo requisito
-1. Solicitar al usuario el nombre o identificador del nuevo requisito en el que va a trabajar (por ejemplo, `feat/cag-prompt-tuning` o `fix-rate-limits`).
+## Procedimiento
 
-### Paso 5: Crear y posicionarse en la nueva rama
-1. Asegurarse de tener la versión más reciente de `main` (o la rama base configurada):
+### 1. Comprobar el estado inicial
+
+1. Ejecutar:
+
    ```bash
-   git checkout main
-   git pull origin main
+   git branch --show-current
+   git status
    ```
-2. Crear la nueva rama para el requisito y posicionarse en ella:
+
+2. Confirmar que la rama de la sesión anterior está identificada.
+3. Si contiene cambios pendientes, ejecutar primero `/cerrar-sesion`.
+4. No cambiar de rama hasta que el directorio de trabajo esté limpio y la
+   rama anterior esté subida a `origin`.
+
+### 2. Integrar la sesión anterior
+
+1. Actualizar `main`:
+
    ```bash
-   git checkout -b <nombre-del-requisito>
+   git switch main
+   git pull --ff-only origin main
    ```
-3. Confirmar al usuario que la sesión está abierta, indicando la rama activa actual y que el entorno está listo para comenzar el desarrollo.
+
+2. Integrar la rama anterior:
+
+   ```bash
+   git merge <rama-anterior>
+   ```
+
+3. Si hay conflictos, detenerse, informar de los ficheros afectados y
+   resolverlos antes de continuar.
+4. Ejecutar sobre el resultado integrado:
+
+   ```bash
+   uv run --no-sync pyright
+   uv run pytest
+   ```
+
+5. Si alguna validación falla, no publicar `main`, no crear el tag y no crear
+   la rama nueva.
+6. Si `main` admite push directo, publicar la integración:
+
+   ```bash
+   git push origin main
+   ```
+
+7. Si `main` exige Pull Request, abrirlo desde la rama anterior y continuar
+   solo cuando esté integrado. Crear el Pull Request no equivale a integrar
+   sus cambios.
+
+### 3. Crear el punto de inicio recuperable
+
+1. Calcular el tag `inicio-sesion-NN` y comprobar si ya existe localmente o
+   en `origin`.
+2. Si ya existe, informar del tag y del commit al que apunta y detenerse. Un
+   tag publicado **MUST NOT** moverse ni eliminarse sin autorización expresa.
+3. Si no existe, crearlo y publicarlo:
+
+   ```bash
+   git tag -a inicio-sesion-NN -m "Estado inicial de la sesión NN"
+   git push origin inicio-sesion-NN
+   ```
+
+### 4. Abrir la rama de la nueva sesión
+
+1. Crear la rama desde el mismo commit etiquetado:
+
+   ```bash
+   git switch -c <usuario>/sesionNN inicio-sesion-NN
+   ```
+
+2. Comprobar que la rama y el tag apuntan al mismo commit:
+
+   ```bash
+   git rev-parse HEAD
+   git rev-list -n 1 inicio-sesion-NN
+   git status
+   ```
+
+3. Informar de la rama activa, el tag publicado, el commit compartido y el
+   resultado de las validaciones.

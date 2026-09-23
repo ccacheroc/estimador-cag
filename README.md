@@ -190,9 +190,10 @@ cd estimador-cag
 git fetch --tags --prune
 ```
 
-El workflow `/cerrar-sesion` crea y publica un tag anotado con el formato
-`inicio-sesion-<NN+1>`. Cada tag identifica el punto de partida validado para
-la sesión siguiente. Para consultar los disponibles:
+El workflow `/abrir-sesion` integra primero la rama anterior en `main` y crea
+sobre ese estado un tag anotado con el formato `inicio-sesion-<NN>`. Cada tag
+identifica el punto de partida validado de esa sesión. Para consultar los
+disponibles:
 
 ```bash
 git tag --list 'inicio-sesion-*' --sort=-version:refname
@@ -213,8 +214,9 @@ sesión 04:
 git switch -c <usuario>/sesion04 inicio-sesion-04
 ```
 
-El nombre y el mensaje de cada nuevo tag se confirman con el usuario durante
-`/cerrar-sesion` antes de crearlo y subirlo a `origin`.
+Si el tag calculado ya existe, `/abrir-sesion` se detiene: un tag publicado no
+se mueve ni se elimina sin autorización expresa. `/cerrar-sesion` se limita a
+validar, confirmar y subir la rama actual.
 
 Copia la plantilla de configuración `.env.example` para generar tu archivo `.env`:
 
