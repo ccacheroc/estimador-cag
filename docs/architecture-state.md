@@ -136,11 +136,14 @@ servicio Python y pueden ejecutarse como procesos independientes.
 
 Las pruebas unitarias y de integración (`tests/`) comprueban la estructura mínima,
 el contrato HTTP, los Problem Details y su declaración OpenAPI, la composición del prompt,
-los metadatos y la integración de Streamlit con el servicio. Las pruebas End-to-End
-de navegador sobre la interfaz web Streamlit se implementan con Playwright
-(`pytest-playwright` en `tests/e2e/`). Las llamadas externas se sustituyen por dobles de
-prueba en todas las suites para garantizar aislamiento y no incurrir en costes externos.
-GitHub Actions ejecuta la suite en pushes a `main` y pull requests.
+los metadatos y la integración de Streamlit con el servicio. Playwright
+(`pytest-playwright`) está adoptado para las pruebas End-to-End de la interfaz
+web, con Chromium como único navegador soportado actualmente, pero
+`tests/e2e/` todavía no contiene pruebas ejecutables. Las suites implementadas
+sustituyen las llamadas externas por dobles para garantizar aislamiento y no
+incurrir en costes externos. GitHub Actions ejecuta las pruebas unitarias y de
+integración en pushes a `main` y pull requests; la ejecución E2E permanece
+pendiente.
 
 ## Límites conocidos
 
@@ -150,5 +153,8 @@ GitHub Actions ejecuta la suite en pushes a `main` y pull requests.
 - No hay una política propia de timeout, reintentos o límites de concurrencia.
 - El health check no verifica la disponibilidad del proveedor externo.
 - El coste calculado es orientativo y depende de las tarifas configuradas.
+- La suite E2E con Playwright y su ejecución en CI todavía no están
+  implementadas.
+- No existe todavía una distribución de la aplicación mediante contenedores.
 - RAG, recuperación semántica y agentes pertenecen a evoluciones futuras, no
   al estado implementado.

@@ -16,6 +16,10 @@ Adoptar **Playwright** (a través de la integración oficial `pytest-playwright`
 
 Los tests E2E residirán en `tests/e2e/`, se ejecutarán mediante `uv run pytest tests/e2e` y por defecto funcionarán en modo *headless*. Conforme a las reglas de determinismo y aislamiento del proyecto, los tests E2E interceptarán o simularán la frontera del LLM (mediante dobles de prueba o configuración local) para evitar consumo de tokens de OpenAI y latencias no deterministas durante las pruebas automatizadas.
 
+El alcance inicial de compatibilidad y ejecución automatizada se limita a
+**Chromium**. Firefox y WebKit quedan fuera del soporte actual hasta que exista
+un requisito explícito que justifique ampliar la matriz de navegadores.
+
 ## Justificación frente a alternativas
 
 ### 1. Frente a Cypress
@@ -47,6 +51,6 @@ Los tests E2E residirán en `tests/e2e/`, se ejecutarán mediante `uv run pytest
 ## Consecuencias
 
 - Se añade `pytest-playwright` al grupo de desarrollo en `pyproject.toml` gestionado por `uv`.
-- La configuración del entorno local y de CI requiere el paso adicional `uv run playwright install` para descargar los binarios de los navegadores.
+- La configuración del entorno local y de CI requiere el paso adicional `uv run playwright install chromium` para descargar el binario soportado.
 - Los tests E2E deben organizarse en `tests/e2e/` y configurarse para ejecutar el servidor de Streamlit contra un puerto efímero o configurable, asegurando el aislamiento frente a instancias locales en ejecución.
 - Toda prueba E2E debe cumplir con las directrices de aislamiento y determinismo establecidas en `.harness/rules/testing-standards.md`, sustituyendo las llamadas a la API de OpenAI por respuestas simuladas o dobles de prueba para evitar consumo de créditos y mitigar tiempos de espera aleatorios.

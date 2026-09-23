@@ -169,7 +169,10 @@ uv run uvicorn app.main:app --reload
 
 ## Guía de desarrollo (Development Guide)
 
-Esta guía detalla el paso a paso para configurar el entorno local, arrancar los servicios y ejecutar la suite de pruebas unitarias, de integración y End-to-End con Playwright.
+Esta guía detalla cómo clonar y configurar el proyecto, recuperar un punto
+de inicio etiquetado, arrancar los servicios y ejecutar las comprobaciones
+automatizadas disponibles. Playwright está adoptado para las futuras pruebas
+End-to-End (E2E), con soporte inicial limitado a Chromium.
 
 ### 1. Requisitos previos
 
@@ -179,12 +182,39 @@ Esta guía detalla el paso a paso para configurar el entorno local, arrancar los
 
 ### 2. Clonación y configuración del entorno
 
-Clona el repositorio si aún no lo has hecho y sitúate en la raíz del proyecto:
+Clona el repositorio y sitúate en su raíz:
 
 ```bash
-git clone <url-del-repositorio>
+git clone https://github.com/ccacheroc/estimador-cag.git
 cd estimador-cag
+git fetch --tags --prune
 ```
+
+El workflow `/cerrar-sesion` crea y publica un tag anotado con el formato
+`inicio-sesion-<NN+1>`. Cada tag identifica el punto de partida validado para
+la sesión siguiente. Para consultar los disponibles:
+
+```bash
+git tag --list 'inicio-sesion-*' --sort=-version:refname
+```
+
+Para continuar el trabajo desde uno de esos puntos, crea una rama a partir del
+tag. No trabajes directamente sobre el tag, porque Git dejaría el repositorio
+en estado `detached HEAD`:
+
+```bash
+git switch -c <nombre-rama> inicio-sesion-<NN>
+```
+
+Por ejemplo, para iniciar una rama de trabajo desde el comienzo validado de la
+sesión 04:
+
+```bash
+git switch -c <usuario>/sesion04 inicio-sesion-04
+```
+
+El nombre y el mensaje de cada nuevo tag se confirman con el usuario durante
+`/cerrar-sesion` antes de crearlo y subirlo a `origin`.
 
 Copia la plantilla de configuración `.env.example` para generar tu archivo `.env`:
 
@@ -209,16 +239,17 @@ uv sync
 
 ### 4. Instalación de navegadores para Playwright
 
-Para habilitar las pruebas End-to-End (E2E), instala los binarios de los navegadores gestionados por Playwright:
+El proyecto soporta actualmente solo Chromium para las futuras pruebas E2E.
+Instala el binario gestionado por Playwright:
 
 ```bash
-uv run playwright install
+uv run playwright install chromium
 ```
 
 *(Opcional)* Si estás en Linux y necesitas instalar dependencias del sistema operativo para los navegadores:
 
 ```bash
-uv run playwright install --with-deps
+uv run playwright install --with-deps chromium
 ```
 
 ### 5. Arranque de los servicios en desarrollo
@@ -251,7 +282,11 @@ uv run pytest tests/test_*.py -v
 ```
 
 #### Pruebas End-to-End (E2E) con Playwright
-Las pruebas de navegador verifican la interfaz Streamlit y los flujos integrados:
+
+Playwright y Chromium están configurados, pero la suite E2E aún no contiene
+pruebas ejecutables. Su implementación y conexión con CI están registradas en
+[00-TRABAJO-PENDIENTE.md](00-TRABAJO-PENDIENTE.md). Cuando se implemente, estos
+serán los comandos de ejecución:
 
 - **Ejecución en modo headless (por defecto, para terminal y CI):**
   ```bash
@@ -283,4 +318,10 @@ uv run --no-sync pyright
 - Elección de framework HTTP: [docs/decisions/ADR-001-fastapi.md](docs/decisions/ADR-001-fastapi.md)
 - Elección de framework E2E Playwright: [docs/decisions/ADR-002-playwright-e2e.md](docs/decisions/ADR-002-playwright-e2e.md)
 
-La validación automática continua se define en [.github/workflows/ci.yml](.github/workflows/ci.yml). En cada push a `main` y en cada pull request, GitHub Actions instala las dependencias fijadas en `uv.lock`, comprueba `app/` y `tests/` con Pyright en modo estricto y ejecuta la suite de pruebas automatizadas con dobles de prueba para OpenAI.
+La validación automática continua se define en
+[.github/workflows/ci.yml](.github/workflows/ci.yml). En cada push a `main` y en
+cada pull request, GitHub Actions instala las dependencias fijadas en `uv.lock`
+y Chromium, comprueba `app/` y `tests/` con Pyright en modo estricto y ejecuta
+las pruebas unitarias y de integración actuales con dobles para OpenAI. La
+ejecución E2E en CI permanece pendiente hasta que exista al menos una prueba de
+navegador.
